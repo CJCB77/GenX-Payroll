@@ -7,8 +7,10 @@ from django.contrib.auth import get_user_model
 from .serializers import LoginSerializer
 from .services import OdooClient, OdooClientError
 import jwt
+import dotenv
+import os
 
-
+dotenv.load_dotenv()
 
 User = get_user_model()
 
@@ -35,8 +37,9 @@ class LoginView(generics.GenericAPIView):
         serializer.is_valid(raise_exception=True)
         try:
             data = OdooClient().authenticate(
-                serializer.validated_data["username"], 
-                serializer.validated_data["password"]
+                username=serializer.validated_data["username"], 
+                password=serializer.validated_data["password"],
+                database=os.getenv("ODOO_DB")
             )
         except OdooClientError:
             return Response({"error": "Invalid credentials"}, status=status.HTTP_401_UNAUTHORIZED)
@@ -46,7 +49,7 @@ class LoginView(generics.GenericAPIView):
         # Decode token without verifying, we can trust Odoo
         payload = jwt.decode(token, options={"verify_signature": False})
         username = serializer.validated_data["username"]
-        odoo_user_id = payload["sub"]
+        odoo_user_id = int(payload["sub"])
         first_name, last_name = parse_name(payload.get("name", ''))
         email = payload.get("email", '')
 

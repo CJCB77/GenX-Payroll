@@ -8,14 +8,16 @@ class OdooClient:
     def __init__(self):
         self.base_url = settings.ODOO_BASE_URL
     
-    def authenticate(self, username, password):
-        login_url = "f{self.base_url}/rest/auth"
+    def authenticate(self, username, password, database, method="credentials"):
+        login_url = f"{self.base_url}/rest/auth"
         try:
             res = requests.post(
                 login_url,
                 json={
+                    "method": method,
                     "username": username,
-                    "password": password
+                    "password": password,
+                    "database": database
                 },
                 timeout=10
             )
