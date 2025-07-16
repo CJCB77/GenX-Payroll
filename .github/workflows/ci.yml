@@ -28,8 +28,12 @@ jobs:
           --health-timeout 5s
           --health-retries 5
     env:
-        # Point Django at the test Postgres instance
-        DATABASE_URL: postgres://postgres:postgres@localhost:5432/test_db
+        # match what your settings.py is reading
+        DB_NAME: test_db
+        DB_USER: postgres
+        DB_PASSWORD: postgres
+        DB_HOST: localhost
+        DB_PORT: "5432"
         # Secret needed
         JWT_SECRET_KEY: ${{ secrets.JWT_SECRET_KEY }}
         JWT_ALGORITHM: ${{ secrets.JWT_ALGORITHM }}
