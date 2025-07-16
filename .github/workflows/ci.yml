@@ -64,8 +64,8 @@ jobs:
 
       - name: Apply migrations
         working-directory: app
-        run: python app/manage.py migrate --no-input
+        run: python manage.py migrate --no-input
 
       - name: Run tests
         working-directory: app
-        run: python app/manage.py test --verbosity=2
+        run: python manage.py test --verbosity=2
