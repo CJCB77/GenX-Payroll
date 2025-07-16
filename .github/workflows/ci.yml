@@ -1,0 +1,65 @@
+name: Payroll CI
+
+on: 
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  test:
+    name: Run tests
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:14
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: test_db
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d test_db"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+        # Point Django at the test Postgres instance
+        DATABASE_URL: postgres://postgres:postgres@localhost:5432/test_db
+        # Secret needed
+        JWT_SECRET_KEY: ${{ secrets.JWT_SECRET_KEY }}
+        JWT_ALGORITHM: ${{ secrets.JWT_ALGORITHM }}
+        ODOO_DB: ${{ secrets.ODOO_DB }}
+        ODOO_URL: ${{ secrets.ODOO_URL }}
+        DJANGO_SETTINGS_MODULE: app.settings
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+    
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Wait for Postgres
+        run: |
+          until pg_isready -h localhost -p 5432 -U postgres -d test_db; do
+            echo "Waiting for Postgres to start..."
+            sleep 2
+          done
+
+      - name: Apply migrations
+        run: python manage.py migrate --no-input
+
+      - name: Run tests
+        run: python manage.py test --verbosity=2
