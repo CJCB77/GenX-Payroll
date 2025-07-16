@@ -3,15 +3,12 @@ Tests for user authentication
 """
 from django.test import TestCase
 from django.contrib.auth import get_user_model
-from django.utils import timezone
 from django.urls import reverse
 
 from rest_framework.test import APIClient
 from rest_framework import status
 from unittest.mock import patch
 from user.services import OdooClientError
-
-import jwt
 
 User = get_user_model()
 
