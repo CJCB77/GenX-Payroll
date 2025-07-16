@@ -66,4 +66,4 @@ jobs:
         run: python app/manage.py migrate --no-input
 
       - name: Run tests
-        run: python manage.py test --verbosity=2
+        run: python app/manage.py test --verbosity=2
