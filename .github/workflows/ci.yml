@@ -59,7 +59,7 @@ jobs:
           done
 
       - name: Apply migrations
-        run: python manage.py migrate --no-input
+        run: python app/manage.py migrate --no-input
 
       - name: Run tests
         run: python manage.py test --verbosity=2
