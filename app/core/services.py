@@ -3,6 +3,13 @@ from logging import getLogger
 
 logger = getLogger(__name__)
 
+_client = None
+def _get_client():
+    global _client
+    if not _client:
+        _client = OdooClient()
+    return _client
+
 EMPLOYEE_FIELDS = [
     "id", "display_name", "mobile_phone", "work_email",
     "identification_id", "contract_id"
@@ -13,7 +20,7 @@ CONTRACT_FIELDS = [
 ]
 
 def get_field_workers():
-    cli = OdooClient()
+    cli = _get_client()
     data = cli.get_model_records(
         model="hr.employee",
         fields=EMPLOYEE_FIELDS,
@@ -35,7 +42,7 @@ def get_employee_contract(cid):
     if not cid:
         return {}
 
-    cli = OdooClient()
+    cli = _get_client()
     logger.info(f"Getting contract with id: {cid}(type: {type(cid)})")
     res = cli.get_model_records(
         model="hr.contract",

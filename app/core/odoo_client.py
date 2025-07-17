@@ -29,6 +29,7 @@ class OdooClient:
         now = time.time()
         if self._token and now < self._token_expires:
             # Still valid
+            logger.info("Using cached token")
             return self._token
         
         logger.info("Authenticating with Odoo...")
