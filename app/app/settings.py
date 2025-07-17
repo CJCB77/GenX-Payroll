@@ -13,6 +13,7 @@ https://docs.djangoproject.com/en/5.0/ref/settings/
 from pathlib import Path
 import os
 from dotenv import load_dotenv
+import sys
 
 load_dotenv()
 
@@ -155,5 +156,47 @@ SPECTACULAR_SETTINGS = {
 
 ODOO_BASE_URL = os.getenv("ODOO_BASE_URL")
 ODOO_DB = os.getenv("ODOO_DB")
+ODOO_SERVICE_USERNAME = os.getenv("ODOO_SERVICE_USERNAME")
+ODOO_SERVICE_PASSWORD = os.getenv("ODOO_SERVICE_PASSWORD")
 JWT_SECRET_KEY = os.getenv("JWT_SECRET_KEY")
 JWT_ALGORITHM = os.getenv("JWT_ALGORITHM")
+
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,    # keep Django’s default loggers
+    'formatters': {
+        'verbose': {
+            'format': '[%(asctime)s] %(levelname)-5s %(name)s: %(message)s'
+        },
+    },
+    'handlers': {
+        'console':{
+            'class': 'logging.StreamHandler',
+            'stream': sys.stdout,
+            'formatter': 'verbose',
+        },
+    },
+    'loggers': {
+        # your module logger (core.odoo_client) at DEBUG level
+        'core': {
+            'handlers': ['console'],
+            'level': 'DEBUG',
+            'propagate': False,
+        },
+        'payroll': {
+            'handlers': ['console'],
+            'level': 'DEBUG',
+            'propagate': False,
+        },
+        # optionally capture all Django logs at INFO
+        'django': {
+            'handlers': ['console'],
+            'level': 'INFO',
+        },
+        # root logger—catch anything else
+        '': {
+            'handlers': ['console'],
+            'level': 'WARNING',
+        },
+    }
+}

@@ -6,6 +6,9 @@ from django.core.management.base import BaseCommand
 from payroll.models import FieldWorker
 from core.services import get_field_workers, get_employee_contract
 from django.utils import timezone
+from logging import getLogger
+
+logger = getLogger(__name__)
 
 class Command(BaseCommand):
 
@@ -13,6 +16,8 @@ class Command(BaseCommand):
         total = 0
         for employee in get_field_workers():
             contract = get_employee_contract(employee["odoo_contract_id"]) or {}
+            logger.info(f"Contract: {contract}")
+
 
             defaults = {
                 "name": employee["name"],
@@ -27,6 +32,7 @@ class Command(BaseCommand):
             }
             field_worker, created = FieldWorker.objects.update_or_create(
                 odoo_employee_id=employee["odoo_employee_id"],
+                odoo_contract_id=employee["odoo_contract_id"],
                 defaults=defaults,
             )
             verb = "Created" if created else "Updated"

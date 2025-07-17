@@ -16,7 +16,7 @@ class OdooClient:
         # Service account credentials
         self.username = settings.ODOO_SERVICE_USERNAME
         self.password = settings.ODOO_SERVICE_PASSWORD
-        self.database = settings.ODOO_DATABASE
+        self.database = settings.ODOO_DB
         # in-memory cache
         self._token = None
         self._token_expires = 0
@@ -78,23 +78,33 @@ class OdooClient:
         self._token_expires = 0
         self.session.headers.pop("Authorization", None)
 
-    def get_model_records(self, model, fields, domain=None, **extra):
+    def get_model_records(self, model, fields, **filters):
         # Ensure we have a valid token
         self._authenticate()
 
         url = f"{self.base_url}/rest/models/{model}"
         params = {"_fields": ",".join(fields)}
-        if domain is not None:
-            params["domain"] = json.dumps(domain)
-        params.update(extra)
 
-        logger.info(f"GET {url} with params: {params} and domain: {domain}")
-        res = self.session.get(url, params=params, timeout=10)
-        if res.status_code == 401:
-            # Token may have expired, clear it and try again
-            self._clear_token()
-            self._authenticate()
+        # Add field filters - convert boolean values to lowercase strings
+        for key, value in filters.items():
+            if isinstance(value, bool):
+                params[key] = str(value).lower()
+            else:
+                params[key] = value
+
+        logger.info(f"GET {url} with params: {params}")
+        try:
             res = self.session.get(url, params=params, timeout=10)
-        if res.status_code != 200:
-            raise OdooClientError(f"GET {url} returned {res.status_code}")
-        return res.json()
+            if res.status_code == 401:
+                # Token may have expired, clear it and try again
+                self._clear_token()
+                self._authenticate()
+                res = self.session.get(url, params=params, timeout=10)
+            
+            if res.status_code != 200:
+                raise OdooClientError(f"GET {url} returned {res.status_code}")
+            
+            return res.json()
+        
+        except requests.RequestException as e:
+            raise OdooClientError(f"Connection error: {e}")
