@@ -1,6 +1,9 @@
+from django.utils import timezone
+from django.db import transaction
 from celery import shared_task
 from celery.utils.log import get_task_logger
 from .models import FieldWorker
+from datetime import datetime
 
 logger = get_task_logger(__name__)
 
@@ -28,6 +31,73 @@ def sync_employee(self, payload):
                 logger.info(f"Created field worker: {field_worker}")
             else:
                 logger.info(f"Updated field worker: {field_worker}")
+    except KeyError as e:
+        logger.error(f"Missing required fields in payload: {e}")
+        raise self.retry(exc=e)
+    except Exception as e:
+        logger.error(f"Error syncing employee: {e}")
+        raise self.retry(exc=e)
+    
+@shared_task(bind=True, max_retries=3, default_retry_delay=30)
+def sync_contract(self, payload):
+    logger.info(f"Received a payload: {payload}")
+    try:
+        action = payload.get("action")
+        contract_id = payload.get("contract_id")
+        # Get timestamp
+        update_timestamp = payload.get("timestamp")
+        if not update_timestamp:
+            # Fallback to current timestamp
+            update_timestamp = timezone.now().isoformat()
+            logger.warning(f"Timestamp not found in payload, using current timestamp: {update_timestamp}")
+
+        if isinstance(update_timestamp, str):
+            update_timestamp = datetime.fromisoformat(update_timestamp.replace("Z", "+00:00"))
+
+        contract_data = {
+            "wage": payload["wage"],
+            "start_date": payload["start_date"],
+            "end_date": payload["end_date"],
+            "contract_status": payload["contract_status"],
+        }
+
+        if action in ["update", "create"]:
+            with transaction.atomic():
+                # Use select_for_update() to lock the row for update
+                field_workers = FieldWorker.objects.select_for_update().filter(odoo_contract_id=contract_id)
+                count = field_workers.count()
+
+                if count == 0:
+                    logger.warning(f"No field worker found for contract_id: {contract_id}")
+                    return
+
+                elif count > 1:
+                    logger.warning(f"Multiple field workers found for contract_id: {contract_id}")
+                    for field_worker in field_workers:
+                        if not field_worker.last_sync or update_timestamp > field_worker.last_sync:
+                            field_worker.wage = contract_data["wage"]
+                            field_worker.start_date = contract_data["start_date"]
+                            field_worker.end_date = contract_data["end_date"]
+                            field_worker.contract_status = contract_data["contract_status"]
+                            field_worker.last_sync = timezone.now()
+                            field_worker.save()
+                            logger.info(f"Updated field worker: {field_worker}")
+                        else:
+                            logger.info(f"Skipping - field worker already synced: {field_worker}")
+                else:
+                    # Single field worker - normal case
+                    field_worker = field_workers[0]
+                    if not field_worker.last_sync or update_timestamp > field_worker.last_sync:
+                        field_worker.wage = contract_data["wage"]
+                        field_worker.start_date = contract_data["start_date"]
+                        field_worker.end_date = contract_data["end_date"]
+                        field_worker.contract_status = contract_data["contract_status"]
+                        field_worker.last_sync = timezone.now()
+                        field_worker.save()
+                        logger.info(f"Updated field worker: {field_worker}")
+                    else:
+                        logger.info(f"Field worker already synced: {field_worker}")
+            
     except KeyError as e:
         logger.error(f"Missing required fields in payload: {e}")
         raise self.retry(exc=e)
