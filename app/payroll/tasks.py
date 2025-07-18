@@ -13,6 +13,13 @@ def sync_employee(self, payload):
     try:
         action = payload.get("action", "create")
         employee_id = payload.get("id")
+        update_timestamp = payload.get("timestamp")
+
+        # Convert timestamp if provided
+        if update_timestamp and isinstance(update_timestamp, str):
+            update_timestamp = datetime.fromisoformat(update_timestamp.replace('Z', '+00:00'))
+        else:
+            update_timestamp = timezone.now()
 
         employee_data = {
             "name": payload["name"],
@@ -20,6 +27,11 @@ def sync_employee(self, payload):
             "mobile_phone": payload["mobile_phone"],
             "identification_number": payload["identification_number"],
             "odoo_contract_id": payload["contract_id"],
+            "wage": payload["wage"],
+            "start_date": payload["start_date"],
+            "end_date": payload["end_date"],
+            "contract_status": payload["contract_status"],
+            "last_sync": timezone.now(),
         }
 
         if action in ["update", "create"]:
