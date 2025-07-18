@@ -1,6 +1,5 @@
 from rest_framework import authentication, exceptions
 from django.contrib.auth import get_user_model
-from .services import OdooClient, OdooClientError
 from django.conf import settings
 import jwt
 

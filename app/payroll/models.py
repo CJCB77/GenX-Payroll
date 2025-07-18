@@ -13,7 +13,7 @@ class FieldWorker(models.Model):
     identification_number = models.CharField(max_length=10, unique=True)
 
     # From Odoo contract table
-    wage = models.DecimalField(max_digits=10, decimal_places=2)
+    wage = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
     start_date = models.DateField(null=True, blank=True)
     end_date = models.DateField(null=True, blank=True)
     contract_status = models.CharField(max_length=255, null=True, blank=True)

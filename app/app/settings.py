@@ -158,8 +158,21 @@ ODOO_BASE_URL = os.getenv("ODOO_BASE_URL")
 ODOO_DB = os.getenv("ODOO_DB")
 ODOO_SERVICE_USERNAME = os.getenv("ODOO_SERVICE_USERNAME")
 ODOO_SERVICE_PASSWORD = os.getenv("ODOO_SERVICE_PASSWORD")
+ODOO_API_KEY = os.getenv("ODOO_API_KEY")
+
 JWT_SECRET_KEY = os.getenv("JWT_SECRET_KEY")
 JWT_ALGORITHM = os.getenv("JWT_ALGORITHM")
+
+CELERY_BROKER_URL = os.getenv("CELERY_BROKER_URL", "redis://127.0.0.1:6379/0")
+CELERY_RESULT_BACKEND = os.getenv("CELERY_RESULT_BACKEND", "redis://127.0.0.1:6379/0")
+CELERY_ACCEPT_CONTENT = ["json"]
+CELERY_TASK_SERIALIZER = "json"
+CELERY_RESULT_SERIALIZER = "json"
+
+# Add connection pool settings to avoid connection issues
+CELERY_BROKER_CONNECTION_RETRY_ON_STARTUP = True
+CELERY_BROKER_CONNECTION_RETRY = True
+CELERY_BROKER_CONNECTION_MAX_RETRIES = 10
 
 LOGGING = {
     'version': 1,
@@ -200,3 +213,11 @@ LOGGING = {
         },
     }
 }
+
+try:
+    import redis
+    r = redis.Redis.from_url(CELERY_BROKER_URL)
+    r.ping()
+    print("Redis connection successful.")
+except Exception as e:
+    print(f"Redis connection failed: {e}")
