@@ -35,14 +35,15 @@ def sync_employee(self, payload):
         }
 
         if action in ["update", "create"]:
-            field_worker, created =FieldWorker.objects.update_or_create(
-                odoo_employee_id = employee_id,
-                defaults=employee_data
-            )
-            if created:
-                logger.info(f"Created field worker: {field_worker}")
-            else:
-                logger.info(f"Updated field worker: {field_worker}")
+            with transaction.atomic():
+                field_worker, created =FieldWorker.objects.update_or_create(
+                    odoo_employee_id = employee_id,
+                    defaults=employee_data
+                )
+                if created:
+                    logger.info(f"Created field worker: {field_worker}")
+                else:
+                    logger.info(f"Updated field worker: {field_worker}")
     except KeyError as e:
         logger.error(f"Missing required fields in payload: {e}")
         raise self.retry(exc=e)
