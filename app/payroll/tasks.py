@@ -1,11 +1,11 @@
 from django.utils import timezone
 from django.db import transaction
 from celery import shared_task
-from celery.utils.log import get_task_logger
+from logging import getLogger
 from .models import FieldWorker
 from datetime import datetime
 
-logger = get_task_logger(__name__)
+logger = getLogger(__name__)
 
 @shared_task(bind=True, max_retries=3, default_retry_delay=30)
 def sync_employee(self, payload):
