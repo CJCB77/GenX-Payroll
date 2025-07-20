@@ -49,7 +49,7 @@ def sync_employee(self, payload):
                     logger.info(f"Created field worker: {field_worker}")
                 else:
                     logger.info(f"Field worker already exists and is up to date: {field_worker}")
-                    
+
     except KeyError as e:
         msg = f"Missing required fields in payload: {e}"
         logger.error(msg)
@@ -82,7 +82,7 @@ def sync_contract(self, payload):
             "contract_status": payload["contract_status"],
         }
 
-        if action in ["update", "create"]:
+        if action == "update":
             with transaction.atomic():
                 # Use select_for_update() to lock the row for update
                 field_workers = FieldWorker.objects.select_for_update().filter(odoo_contract_id=contract_id)

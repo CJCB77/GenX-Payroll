@@ -134,3 +134,63 @@ class EmployeeWebhooksTests(APITestCase):
             sync_employee(bad_payload)
 
         self.assertIn("Missing required fields", str(e.exception))
+
+@override_settings(CELERY_TASK_ALWAYS_EAGER=True, CELERY_TASK_EAGER_PROPAGATES=True)
+class ContractWebHooksTests(APITestCase):
+    def setUp(self):
+        self.fw = FieldWorker.objects.create(
+            name="John Doe",
+            odoo_contract_id=777,
+            odoo_employee_id=99,
+            identification_number="1234567899",
+            wage=600.00,
+            start_date="2023-01-01",
+            end_date=None,
+            contract_status="open",
+            last_sync=datetime.now(pytz.UTC) - timedelta(days=1),
+        )
+    
+    def test_sync_contract_updated_a_field_worker(self):
+        """
+        Posting a contract update should find the existing field worker
+        by odoo_contract_id and update the record
+        """
+        payload = {
+            "contract_id": 777,
+            "wage": 700.00,
+            "start_date": "2023-01-01",
+            "end_date": "2025-01-31",
+            "contract_status": "closed",
+            "action": "update",
+            "timestamp": datetime.now(pytz.UTC).isoformat(),
+        }
+
+        res = self.client.post(CONTRACT_HOOK_URL, payload, format="json")
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+
+        self.fw.refresh_from_db()
+        self.assertEqual(self.fw.wage, 700.00)
+        self.assertEqual(self.fw.start_date.isoformat(), "2023-01-01")
+        self.assertEqual(self.fw.end_date.isoformat(), "2025-01-31")
+        self.assertEqual(self.fw.contract_status, "closed")
+
+    def test_sync_contract_skips_when_no_matching_worker(self):
+        """
+        If no matching worker is found, the task should skip
+        """
+        payload = {
+            "contract_id": 999,
+            "wage": 700.00,
+            "start_date": "2023-01-01",
+            "end_date": "2025-01-31",
+            "contract_status": "closed",
+            "action": "update",
+            "timestamp": datetime.now(pytz.UTC).isoformat(),
+        }
+
+        res = self.client.post(CONTRACT_HOOK_URL, payload, format="json")
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+
+        self.fw.refresh_from_db()
+        self.assertEqual(self.fw.wage, 600.00)
+        self.assertEqual(FieldWorker.objects.filter(odoo_contract_id=999).count(), 0)
