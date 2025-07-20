@@ -31,25 +31,33 @@ def sync_employee(self, payload):
             "start_date": payload["start_date"],
             "end_date": payload["end_date"],
             "contract_status": payload["contract_status"],
-            "last_sync": timezone.now(),
+            "last_sync": update_timestamp
         }
 
         if action in ["update", "create"]:
             with transaction.atomic():
-                field_worker, created =FieldWorker.objects.update_or_create(
+                field_worker, created =FieldWorker.objects.get_or_create(
                     odoo_employee_id = employee_id,
                     defaults=employee_data
                 )
-                if created:
+                if not created and field_worker.last_sync < update_timestamp:
+                    for k, v in employee_data.items():
+                        setattr(field_worker, k, v)
+                    field_worker.save()
+                    logger.info(f"Updated field worker: {field_worker}")
+                elif created:
                     logger.info(f"Created field worker: {field_worker}")
                 else:
-                    logger.info(f"Updated field worker: {field_worker}")
+                    logger.info(f"Field worker already exists and is up to date: {field_worker}")
+                    
     except KeyError as e:
-        logger.error(f"Missing required fields in payload: {e}")
-        raise self.retry(exc=e)
+        msg = f"Missing required fields in payload: {e}"
+        logger.error(msg)
+        raise self.retry(exc=KeyError(msg))
     except Exception as e:
-        logger.error(f"Error syncing employee: {e}")
-        raise self.retry(exc=e)
+        msg = f"Error syncing employee: {e}"
+        logger.error(msg)
+        raise self.retry(exc=Exception(msg))
     
 @shared_task(bind=True, max_retries=3, default_retry_delay=30)
 def sync_contract(self, payload):
