@@ -1,6 +1,6 @@
 from rest_framework.views import APIView
 from rest_framework.response import Response
-from rest_framework import status
+from rest_framework import status, viewsets
 from rest_framework.permissions import AllowAny
 from .tasks import sync_employee, sync_contract
 import os
@@ -36,3 +36,4 @@ class SyncContractHook(APIView):
         logger.info(f"Received a contract payload: {request.data}")
         sync_contract.delay(request.data)
         return Response({"status":"queued"}, status=status.HTTP_200_OK)
+    
