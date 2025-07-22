@@ -103,7 +103,7 @@ class Activity(models.Model):
 
     class Meta:
         indexes = [
-            models.Index(fields=['activity']),
+            models.Index(fields=['activity_group']),
             models.Index(fields=['labor_type']),
         ]
 
@@ -169,3 +169,9 @@ class PayrollBatchLine(models.Model):
                 name = 'unique_payroll_batch_line',
             )
         ]
+
+class PayrollConfiguration(models.Model):
+    """Payroll configuration"""
+    mobilization_percentage = models.DecimalField(max_digits=10, decimal_places=2)
+    extra_hours_percentage = models.DecimalField(max_digits=10, decimal_places=2)
+    basic_monthly_wage = models.DecimalField(max_digits=10, decimal_places=2)
