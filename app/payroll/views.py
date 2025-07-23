@@ -64,7 +64,7 @@ class FieldWorkerListView(generics.ListAPIView):
     ordering = ['-created_at']
     search_fields = ['name', 'identification_number']
 
-    @method_decorator(cache_page(60 * 5)) # 5 minutes
+    @method_decorator(cache_page(60 * 15)) # 15 minutes
     def list(self, request, *args, **kwargs):
         return super().list(request, *args, **kwargs)
     
