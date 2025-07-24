@@ -23,6 +23,7 @@ class FieldWorkerFilter(filters.FilterSet):
         fields = [
             'odoo_employee_id', 
             'odoo_contract_id', 
+            'identification_number',
             'wage',
             'email',
             'contract_status',

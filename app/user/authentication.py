@@ -25,7 +25,7 @@ class OdooJWTAuthentication(authentication.BaseAuthentication):
         try:
             payload = jwt.decode(
                 token,
-                settings.ODOO_JWT_SECRET,
+                settings.JWT_SECRET_KEY,
                 algorithms=[settings.JWT_ALGORITHM],
                 options={"verify_aud": False}
             )

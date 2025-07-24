@@ -17,7 +17,7 @@ class FieldWorkerSerializer(serializers.ModelSerializer):
     class Meta:
         model = FieldWorker
         fields = '__all__'
-        read_only_fields = fields
+        read_only_fields = ['__all__']
 
 class FieldWorkerListSerializer(serializers.ModelSerializer):
     """
@@ -26,6 +26,7 @@ class FieldWorkerListSerializer(serializers.ModelSerializer):
     class Meta:
         model = FieldWorker
         fields = [
+            'id',
             'odoo_employee_id',
             'name',
             'identification_number',
@@ -33,4 +34,4 @@ class FieldWorkerListSerializer(serializers.ModelSerializer):
             'wage',
             'email',
         ]
-        read_only_fields = '__all__'
+        read_only_fields = ['__all__']

@@ -42,9 +42,10 @@ INSTALLED_APPS = [
     "django.contrib.sessions",
     "django.contrib.messages",
     "django.contrib.staticfiles",
+    "core",
     "rest_framework",
     "drf_spectacular",
-    "django-filters",
+    "django_filters",
     "user",
     "payroll",
 ]
@@ -160,7 +161,7 @@ REST_FRAMEWORK = {
         'rest_framework.permissions.IsAuthenticated',
     ),
     'DEFAULT_FILTER_BACKENDS': (
-        'django_filters.rest_framework.DjangoFilterBackend'
+        'django_filters.rest_framework.DjangoFilterBackend',
     ),
     'DEFAULT_THROTTLE_CLASSES': [
         'rest_framework.throttling.AnonRateThrottle',
@@ -176,6 +177,9 @@ REST_FRAMEWORK = {
 
 SPECTACULAR_SETTINGS = {
     'COMPONENT_SPLIT_REQUEST':True,
+    "SERVE_AUTHENTICATION": [
+        "user.authentication.OdooJWTAuthentication"
+    ]
 }
 
 ODOO_BASE_URL = os.getenv("ODOO_BASE_URL")

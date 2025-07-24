@@ -15,7 +15,6 @@ from .serializers import (
 from .filters import (
     FieldWorkerFilter,
 )
-
 from logging import getLogger
 
 logger = getLogger(__name__)
