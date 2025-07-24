@@ -11,6 +11,7 @@ from .models import (
 )
 from .serializers import (
     FieldWorkerListSerializer,
+    FieldWorkerDetailSerializer,
 )
 from .filters import (
     FieldWorkerFilter,
@@ -73,3 +74,11 @@ class FieldWorkerListView(generics.ListAPIView):
         if include_inactive == 'true':
             return self.queryset.all()
         return self.queryset.filter(is_active=True)
+
+class FieldWorkerDetailView(generics.RetrieveAPIView):
+    queryset = FieldWorker.objects.all()
+    serializer_class = FieldWorkerDetailSerializer
+
+    @method_decorator(cache_page(60 * 15))
+    def retrieve(self, request, *args, **kwargs):
+        return super().retrieve(request, *args, **kwargs)

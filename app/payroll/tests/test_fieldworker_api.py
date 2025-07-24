@@ -23,9 +23,13 @@ class PublicFieldWorkerApiTests(APITestCase):
         self.assertEqual(res.status_code, status.HTTP_403_FORBIDDEN)       
 
 class PrivateFieldWorkerApiTests(APITestCase):
+    def _get_detail_url(self, pk):
+        return reverse("payroll:fieldworker-detail", kwargs={"pk": pk})
 
     def setUp(self):
         self.login_url = reverse("user:login")
+        self.list_url = reverse("payroll:fieldworker-list")
+
         login_data = {
             "username": settings.ODOO_SERVICE_USERNAME,
             "password": settings.ODOO_SERVICE_PASSWORD
@@ -78,7 +82,6 @@ class PrivateFieldWorkerApiTests(APITestCase):
                 is_active=False
             ),
         ])
-        self.list_url = reverse("payroll:fieldworker-list")
 
     def test_list_defaults_to_actives_by_default(self):
         res = self.client.get(self.list_url)
@@ -141,3 +144,30 @@ class PrivateFieldWorkerApiTests(APITestCase):
         with CaptureQueriesContext(connection) as ctx:
             self.client.get(self.list_url)
         self.assertLess(len(ctx.captured_queries), 2)
+    
+    def test_single_field_worker_retrieve(self):
+        # Create a worker
+        field_worker = FieldWorker.objects.create(
+            name="Tom holland",
+            odoo_contract_id=5,
+            odoo_employee_id=5,
+            identification_number="1231202832",
+            wage=600.00,
+            start_date="2023-01-01",
+            end_date=None,
+            contract_status="open",
+            last_sync=datetime.now(pytz.UTC) - timedelta(days=1),
+        )
+        detail_url = self._get_detail_url(field_worker.pk)
+        res = self.client.get(detail_url)
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+
+        self.assertEqual(res.data["name"], field_worker.name)
+        self.assertEqual(res.data["odoo_contract_id"], field_worker.odoo_contract_id)
+        self.assertEqual(res.data["odoo_employee_id"], field_worker.odoo_employee_id)
+        self.assertEqual(res.data["identification_number"], field_worker.identification_number)
+    
+    def test_404_if_field_worker_does_not_exist(self):
+        url = self._get_detail_url(9999)
+        res = self.client.get(url)
+        self.assertEqual(res.status_code, status.HTTP_404_NOT_FOUND)

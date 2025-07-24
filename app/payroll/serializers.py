@@ -10,14 +10,13 @@ from .models import (
     PayrollBatch
 )
 
-class FieldWorkerSerializer(serializers.ModelSerializer):
+class FieldWorkerDetailSerializer(serializers.ModelSerializer):
     """
     Serializer for field worker details
     """
     class Meta:
         model = FieldWorker
         fields = '__all__'
-        read_only_fields = ['__all__']
 
 class FieldWorkerListSerializer(serializers.ModelSerializer):
     """
