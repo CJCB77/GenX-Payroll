@@ -21,6 +21,7 @@ class FieldWorkerFilter(filters.FilterSet):
     class Meta:
         model = FieldWorker
         fields = [
+            'id',
             'odoo_employee_id', 
             'odoo_contract_id', 
             'identification_number',
