@@ -27,6 +27,17 @@ jobs:
           --health-interval 5s
           --health-timeout 5s
           --health-retries 5
+      
+      redis:
+        image: redis:8-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 5
+
     env:
         # match what your settings.py is reading
         DB_NAME: test_db
@@ -40,6 +51,13 @@ jobs:
         ODOO_DB: ${{ secrets.ODOO_DB }}
         ODOO_URL: ${{ secrets.ODOO_URL }}
         DJANGO_SETTINGS_MODULE: app.settings
+        
+        # Redis
+        REDIS_URL: "redis://127.0.0.1:6379/1"
+
+        # Celery
+        CELERY_BROKER_URL: "redis://127.0.0.1:6379/0"
+        CELERY_RESULT_BACKEND: "redis://127.0.0.1:6379/0"
     
     steps:
       - name: Checkout code
@@ -63,10 +81,15 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
-      - name: Wait for Postgres
+      - name: Wait for Postgres & Redis
         run: |
           until pg_isready -h localhost -p 5432 -U postgres -d test_db; do
             echo "Waiting for Postgres to start..."
+            sleep 2
+          done
+
+          until redis-cli ping; do
+            echo "Waiting for Redis to start..."
             sleep 2
           done
 

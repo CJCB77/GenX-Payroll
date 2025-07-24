@@ -38,5 +38,5 @@ class FieldWorkerListSerializer(serializers.ModelSerializer):
 class FarmSerializer(serializers.ModelSerializer):
     class Meta:
         model = Farm
-        fields = ['name', 'code', 'description']
+        fields = ['id','name', 'code', 'description']
         read_only_fields = ['id', 'created_at', 'updated_at']
