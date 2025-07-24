@@ -8,10 +8,12 @@ from django.views.decorators.cache import cache_page
 import os
 from .models import (
     FieldWorker,
+    Farm,    
 )
 from .serializers import (
     FieldWorkerListSerializer,
     FieldWorkerDetailSerializer,
+    FarmSerializer,
 )
 from .filters import (
     FieldWorkerFilter,
@@ -82,3 +84,8 @@ class FieldWorkerDetailView(generics.RetrieveAPIView):
     @method_decorator(cache_page(60 * 15))
     def retrieve(self, request, *args, **kwargs):
         return super().retrieve(request, *args, **kwargs)
+    
+class FarmViewSet(viewsets.ModelViewSet):
+    queryset = Farm.objects.all()
+    serializer_class = FarmSerializer
+    

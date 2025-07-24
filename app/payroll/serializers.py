@@ -34,3 +34,9 @@ class FieldWorkerListSerializer(serializers.ModelSerializer):
             'email',
         ]
         read_only_fields = ['__all__']
+
+class FarmSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Farm
+        fields = ['name', 'code', 'description']
+        read_only_fields = ['id', 'created_at', 'updated_at']
