@@ -1,8 +1,12 @@
 from django.urls import reverse
-from django.conf import settings
 from rest_framework import status
 from rest_framework.test import APITestCase
 from ..models import Farm
+from core.tests import AuthenticatedAPITestCase
+
+import logging
+
+logger = logging.getLogger(__name__)
 
 class PublicFarmApiTests(APITestCase):
     def setUp(self):
@@ -12,7 +16,7 @@ class PublicFarmApiTests(APITestCase):
         res = self.client.get(self.list_url)
         self.assertEqual(res.status_code, status.HTTP_403_FORBIDDEN)
 
-class PrivateFarmApiTests(APITestCase):
+class PrivateFarmApiTests(AuthenticatedAPITestCase):
     def _get_farm_detail_url(self, pk):
         return reverse("payroll:farm-detail", kwargs={"pk": pk})
 
@@ -24,26 +28,10 @@ class PrivateFarmApiTests(APITestCase):
             **override
         )
 
-    
     def setUp(self):
+        super().setUp()
         self.login_url = reverse("user:login")
-        self.list_url = reverse("payroll:farm-list")        
-
-        login_data = {
-            "username": settings.ODOO_SERVICE_USERNAME,
-            "password": settings.ODOO_SERVICE_PASSWORD
-        }
-
-        res = self.client.post(self.login_url, login_data, format="json")
-        self.assertEqual(res.status_code, status.HTTP_200_OK,
-            f"Failed to login: {res.content}")
-        
-        # Extract token from response
-        token = res.data["token"]
-        self.assertIsNotNone(token, "No token in response")
-
-        # Set the client to use Bearer token for future requests
-        self.client.credentials(HTTP_AUTHORIZATION=f"Bearer {token}")
+        self.list_url = reverse("payroll:farm-list")    
 
     def test_create_farm(self):
         payload = {

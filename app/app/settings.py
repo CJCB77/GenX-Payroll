@@ -229,6 +229,11 @@ LOGGING = {
             'level': 'DEBUG',
             'propagate': False,
         },
+        'user': {
+            'handlers': ['console'],
+            'level': 'DEBUG',
+            'propagate': False,
+        },
         # optionally capture all Django logs at INFO
         'django': {
             'handlers': ['console'],

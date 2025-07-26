@@ -8,7 +8,7 @@ from .views import (
     FarmViewSet,
 )
 
-router = SimpleRouter()
+router = SimpleRouter(trailing_slash=False)
 router.register(r"farms", FarmViewSet, basename="farm")
 
 app_name = "payroll"
