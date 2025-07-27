@@ -44,7 +44,6 @@ class EmployeeWebhooksTests(APITestCase):
 
     def test_sync_employee_creates_a_field_worker(self):
         payload = self.create_employee_payload()
-        logger.info(f"Payload: {payload}")
 
         res = self.client.post(EMPLOYEE_HOOK_URL, payload, format="json")
 

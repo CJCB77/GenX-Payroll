@@ -135,7 +135,7 @@ class PayrollBatch(models.Model):
     name = models.CharField(max_length=255, unique=True)
     start_date = models.DateField()
     end_date = models.DateField()
-    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, blank=True, null=True)
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='draft')
 
 class PayrollBatchLine(models.Model):

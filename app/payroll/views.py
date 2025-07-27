@@ -5,7 +5,6 @@ from rest_framework.permissions import AllowAny
 from .tasks import sync_employee, sync_contract
 from django.utils.decorators import method_decorator
 from django.views.decorators.cache import cache_page
-import os
 from .models import (
     FieldWorker,
     Farm,    
@@ -46,7 +45,6 @@ class SyncEmployeeHook(APIView):
         Odoo will post a JSON payload with the employee data
         on creation or update
         """
-        logger.info(f"Received an employee payload: {request.data}")
         sync_employee.delay(request.data)
         return Response({"status":"queued"}, status=status.HTTP_200_OK)
 
@@ -60,7 +58,6 @@ class SyncContractHook(APIView):
         Odoo will post a JSON payload with the employee data
         on creation or update
         """
-        logger.info(f"Received a contract payload: {request.data}")
         sync_contract.delay(request.data)
         return Response({"status":"queued"}, status=status.HTTP_200_OK)
     
@@ -138,13 +135,13 @@ class LaborTypeViewSet(viewsets.ModelViewSet):
 class TariffViewSet(viewsets.ModelViewSet):
     queryset = Tariff.objects.all()
     serializer_class = ActivitySerializer
-    filter_sets = ['activity', 'farm']
+    filterset_fields = ['activity', 'farm']
     search_fields = ['name']
 
 class PayrollBatchViewSet(viewsets.ModelViewSet):
     queryset = PayrollBatch.objects.all()
     serializer_class = PayrollBatchSerializer
-    filter_sets = ['status']
+    filterset_fields = ['status']
     search_fields = ['name']
 
 class PayrollConfigurationView(generics.RetrieveUpdateAPIView):

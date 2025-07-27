@@ -59,11 +59,9 @@ class OdooClient:
             if exp:
                 # Convert to timestamp if needed and add safety buffer
                 self._token_expires = int(exp) - 60  # 60 seconds safety buffer
-                logger.info(f"Token expires at: {time.ctime(int(exp))}")
             else:
                 # Fallback: assume 24 hours with safety buffer
                 self._token_expires = now + 86400 - 300  # 5 minutes safety buffer
-                logger.warning("No expiration in token, using 24h default")
         except Exception as e:
             logger.warning(f"Could not decode token expiration:{e}")
             # Fallback: assume 1 hour with safety buffer
