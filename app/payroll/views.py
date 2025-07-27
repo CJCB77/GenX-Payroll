@@ -21,6 +21,7 @@ from .serializers import (
     FarmSerializer,
     ActivityGroupSerializer,
     ActivitySerializer,
+    ActivityDetailSerializer,
     UomSerializer,
 )
 from .filters import (
@@ -108,6 +109,17 @@ class ActivitySet(viewsets.ModelViewSet):
     filterset_fields = ['activity_group', 'labor_type', 'uom']
     search_fields = ['name']
 
+    def get_queryset(self):
+        qs = super().get_queryset()
+        if self.action == "retrieve":
+            qs = qs.select_related("activity_group", "labor_type", "uom")
+        return qs
+
+    def get_serializer_class(self):
+        if self.action == "retrieve":
+            return ActivityDetailSerializer
+        return super().get_serializer_class()
+    
 class UomViewSet(viewsets.ModelViewSet):
     queryset = Uom.objects.all()
     serializer_class = UomSerializer

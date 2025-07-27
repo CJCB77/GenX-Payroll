@@ -63,5 +63,13 @@ class ActivitySerializer(serializers.ModelSerializer):
     class Meta:
         model = Activity
         fields = ['id','name', 'activity_group', 'labor_type', 'uom']
+
+class ActivityDetailSerializer(serializers.ModelSerializer):
+    activity_group = ActivityGroupSerializer(read_only=True)
+    labor_type = LaborTypeSerializer(read_only=True)
+    uom = UomSerializer(read_only=True)
+    class Meta:
+        model = Activity
+        fields = ['id','name', 'activity_group', 'labor_type', 'uom']
         read_only_fields = ['id', 'created_at', 'updated_at']
-    
+
