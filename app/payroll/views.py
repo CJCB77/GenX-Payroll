@@ -26,6 +26,7 @@ from .serializers import (
     UomSerializer,
     PayrollBatchSerializer,
     PayrollConfigurationSerializer,
+    TariffSerializer
 )
 from .filters import (
     FieldWorkerFilter,
@@ -134,7 +135,7 @@ class LaborTypeViewSet(viewsets.ModelViewSet):
 
 class TariffViewSet(viewsets.ModelViewSet):
     queryset = Tariff.objects.all()
-    serializer_class = ActivitySerializer
+    serializer_class = TariffSerializer
     filterset_fields = ['activity', 'farm']
     search_fields = ['name']
 
