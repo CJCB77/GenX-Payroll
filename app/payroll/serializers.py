@@ -40,3 +40,28 @@ class FarmSerializer(serializers.ModelSerializer):
         model = Farm
         fields = ['id','name', 'code', 'description']
         read_only_fields = ['id', 'created_at', 'updated_at']
+
+class ActivityGroupSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ActivityGroup
+        fields = ['id','name', 'code', 'description']
+        read_only_fields = ['id', 'created_at', 'updated_at']
+
+class UomSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Uom
+        fields = ['id','name']
+        read_only_fields = ['id', 'created_at', 'updated_at']
+
+class LaborTypeSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = LaborType
+        fields = ['id','name', 'code', 'calculates_integral', 'calculates_thirteenth_bonus', 'calculates_fourteenth_bonus']
+        read_only_fields = ['id', 'created_at', 'updated_at']
+
+class ActivitySerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Activity
+        fields = ['id','name', 'activity_group', 'labor_type', 'uom']
+        read_only_fields = ['id', 'created_at', 'updated_at']
+    

@@ -9,11 +9,19 @@ import os
 from .models import (
     FieldWorker,
     Farm,    
+    ActivityGroup,
+    Activity,
+    LaborType,
+    Uom,
+    Tariff
 )
 from .serializers import (
     FieldWorkerListSerializer,
     FieldWorkerDetailSerializer,
     FarmSerializer,
+    ActivityGroupSerializer,
+    ActivitySerializer,
+    UomSerializer,
 )
 from .filters import (
     FieldWorkerFilter,
@@ -88,4 +96,25 @@ class FieldWorkerDetailView(generics.RetrieveAPIView):
 class FarmViewSet(viewsets.ModelViewSet):
     queryset = Farm.objects.all()
     serializer_class = FarmSerializer
-    
+
+class ActivityGroupSet(viewsets.ModelViewSet):
+    queryset = ActivityGroup.objects.all()
+    serializer_class = ActivityGroupSerializer
+    search_fields = ['name']
+
+class ActivitySet(viewsets.ModelViewSet):
+    queryset = Activity.objects.all()
+    serializer_class = ActivitySerializer
+    filterset_fields = ['activity_group', 'labor_type', 'uom']
+    search_fields = ['name']
+
+class UomViewSet(viewsets.ModelViewSet):
+    queryset = Uom.objects.all()
+    serializer_class = UomSerializer
+    search_fields = ['name']
+
+class LaborTypeViewSet(viewsets.ModelViewSet):
+    queryset = LaborType.objects.all()
+    serializer_class = ActivitySerializer
+    filterset_fields = ['calculates_integral', 'calculates_thirteenth_bonus', 'calculates_fourteenth_bonus']
+    search_fields = ['name']

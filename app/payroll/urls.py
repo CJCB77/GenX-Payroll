@@ -6,10 +6,18 @@ from .views import (
     FieldWorkerListView,
     FieldWorkerDetailView,
     FarmViewSet,
+    ActivityGroupSet,
+    ActivitySet,
+    UomViewSet,
+    LaborTypeViewSet,
 )
 
 router = SimpleRouter(trailing_slash=False)
 router.register(r"farms", FarmViewSet, basename="farm")
+router.register(r"activity-groups", ActivityGroupSet, basename="activity-group")
+router.register(r"activities", ActivitySet, basename="activity")
+router.register(r"uoms", UomViewSet, basename="uom")
+router.register(r"labor-types", LaborTypeViewSet, basename="labor-type")
 
 app_name = "payroll"
 
