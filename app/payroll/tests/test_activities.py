@@ -175,7 +175,7 @@ class PrivateActivityAPITestCase(AuthenticatedAPITestCase):
         self.assertEqual(res.status_code, status.HTTP_200_OK)
 
         self.assertEqual(res.data["name"], "Test Activity 1")
-        self.assertEqual(res.data["activity_group"], self.activity_group.pk)
+        self.assertEqual(res.data["activity_group"]['name'], self.activity_group.name)
     
     def test_update_activity(self):
         activity = Activity.objects.create(
