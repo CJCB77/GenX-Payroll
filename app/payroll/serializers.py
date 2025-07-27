@@ -7,7 +7,8 @@ from .models import (
     ActivityGroup,
     Farm,
     Tariff,
-    PayrollBatch
+    PayrollBatch,
+    PayrollConfiguration,
 )
 
 class FieldWorkerDetailSerializer(serializers.ModelSerializer):
@@ -73,3 +74,23 @@ class ActivityDetailSerializer(serializers.ModelSerializer):
         fields = ['id','name', 'activity_group', 'labor_type', 'uom']
         read_only_fields = ['id', 'created_at', 'updated_at']
 
+class TariffSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Tariff
+        fields = ['id','name', 'activity', 'farm', 'cost_per_unit']
+        read_only_fields = ['id', 'created_at', 'updated_at']
+
+class PayrollBatchSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = PayrollBatch
+        fields = ['id','name', 'start_date', 'end_date', 'status']
+        read_only_fields = ['id', 'created_at', 'updated_at']
+
+class PayrollConfigurationSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = PayrollConfiguration
+        fields = [
+            "mobilization_percentage",
+            "extra_hours_percentage",
+            "basic_monthly_wage",
+        ]

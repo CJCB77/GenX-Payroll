@@ -109,6 +109,7 @@ class Activity(models.Model):
 
 class Tariff(models.Model):
     """Activity tariffs by farm"""
+    name = models.CharField(max_length=255, unique=True)
     activity = models.ForeignKey(Activity, on_delete=models.CASCADE)
     farm = models.ForeignKey(Farm, on_delete=models.CASCADE)
     cost_per_unit = models.DecimalField(max_digits=10, decimal_places=2)

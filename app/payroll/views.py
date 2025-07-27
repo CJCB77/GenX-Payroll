@@ -13,7 +13,9 @@ from .models import (
     Activity,
     LaborType,
     Uom,
-    Tariff
+    Tariff,
+    PayrollBatch,
+    PayrollConfiguration
 )
 from .serializers import (
     FieldWorkerListSerializer,
@@ -23,6 +25,8 @@ from .serializers import (
     ActivitySerializer,
     ActivityDetailSerializer,
     UomSerializer,
+    PayrollBatchSerializer,
+    PayrollConfigurationSerializer,
 )
 from .filters import (
     FieldWorkerFilter,
@@ -130,3 +134,33 @@ class LaborTypeViewSet(viewsets.ModelViewSet):
     serializer_class = ActivitySerializer
     filterset_fields = ['calculates_integral', 'calculates_thirteenth_bonus', 'calculates_fourteenth_bonus']
     search_fields = ['name']
+
+class TariffViewSet(viewsets.ModelViewSet):
+    queryset = Tariff.objects.all()
+    serializer_class = ActivitySerializer
+    filter_sets = ['activity', 'farm']
+    search_fields = ['name']
+
+class PayrollBatchViewSet(viewsets.ModelViewSet):
+    queryset = PayrollBatch.objects.all()
+    serializer_class = PayrollBatchSerializer
+    filter_sets = ['status']
+    search_fields = ['name']
+
+class PayrollConfigurationView(generics.RetrieveUpdateAPIView):
+    """
+    GET  /api/v1/configuration/ → returns the singleton config
+    PATCH/PUT  /api/v1/configuration/ → update fields on that single row
+    """
+    serializer_class = PayrollConfigurationSerializer
+    
+    def get_object(self):
+        obj, _ = PayrollConfiguration.objects.get_or_create(
+            pk=1,
+            defaults={
+                "mobilization_percentage": 0.0,
+                "extra_hours_percentage": 0.0,
+                "basic_monthly_wage": 0.0,
+            }
+        )
+        return obj
