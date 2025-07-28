@@ -135,13 +135,23 @@ class PayrollBatch(models.Model):
     name = models.CharField(max_length=255, unique=True)
     start_date = models.DateField()
     end_date = models.DateField()
+    iso_year = models.PositiveSmallIntegerField(null=True, blank=True, db_index=True)
+    iso_week = models.PositiveSmallIntegerField(null=True, blank=True, db_index=True)
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, blank=True, null=True)
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='draft')
+
+    def save(self, *args, **kwags):
+        year, week, _weekday = self.start_date.isocalendar()
+        self.iso_week = week
+        self.iso_year = year
+        super().save(*args, **kwags)
 
 class PayrollBatchLine(models.Model):
     # Input fields
     payroll_batch = models.ForeignKey(PayrollBatch, on_delete=models.CASCADE)
     date = models.DateField()
+    iso_year = models.PositiveSmallIntegerField(editable=False)
+    iso_week = models.PositiveSmallIntegerField(editable=False)
     field_worker = models.ForeignKey(FieldWorker, on_delete=models.CASCADE)
     activity = models.ForeignKey(Activity, on_delete=models.CASCADE)
     quantity = models.DecimalField(max_digits=10, decimal_places=2)
@@ -158,6 +168,13 @@ class PayrollBatchLine(models.Model):
 
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+
+    def save(self, *args, **kwags):
+        year, week, _ = self.date.isocalendar()
+        self.iso_week = week
+        self.iso_year = year
+        super().save(*args, **kwags)
+  
 
     class Meta:
         indexes = [
