@@ -18,7 +18,6 @@ class OdooJWTAuthentication(authentication.BaseAuthentication):
 
     def authenticate(self, request):
         header = authentication.get_authorization_header(request).split()
-        logger.info(f"Header: {header}")
         if not header or header[0].decode().lower() != self.keyword.lower():
             return None
         
@@ -26,7 +25,6 @@ class OdooJWTAuthentication(authentication.BaseAuthentication):
             raise exceptions.AuthenticationFailed('Invalid token header')
         
         token = header[1].decode()
-        logger.info(f"Token: {token}")
         try:
             payload = jwt.decode(
                 token,
@@ -34,7 +32,6 @@ class OdooJWTAuthentication(authentication.BaseAuthentication):
                 algorithms=[settings.JWT_ALGORITHM],
                 options={"verify_aud": False}
             )
-            logger.info(f"Payload: {payload}")
         except jwt.ExpiredSignatureError:
             raise exceptions.AuthenticationFailed('Token expired')
         except jwt.InvalidTokenError as e:
@@ -50,7 +47,6 @@ class OdooJWTAuthentication(authentication.BaseAuthentication):
                 "email": payload.get("email", '')
             }
         )
-        logger.info(f"User: {user}")
         
         if not user.is_active:
             raise exceptions.AuthenticationFailed('User is inactive')

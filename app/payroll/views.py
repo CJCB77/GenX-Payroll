@@ -1,3 +1,4 @@
+from django.shortcuts import get_object_or_404
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status, viewsets, generics
@@ -28,7 +29,8 @@ from .serializers import (
     PayrollBatchSerializer,
     PayrollConfigurationSerializer,
     TariffSerializer,
-    PayrollBatchLineSerializer
+    PayrollBatchLineSerializer,
+    PayrollBatchLineWriteSerializer
 )
 from .filters import (
     FieldWorkerFilter,
@@ -163,6 +165,7 @@ class PayrollConfigurationView(generics.RetrieveUpdateAPIView):
                 "mobilization_percentage": 0.0,
                 "extra_hours_percentage": 0.0,
                 "basic_monthly_wage": 0.0,
+                "extra_hour_value": 0.0
             }
         )
         return obj
@@ -187,10 +190,17 @@ class PayrollBatchLineViewSet(viewsets.ModelViewSet):
             return self.queryset.filter(payroll_batch=batch_pk)
         return self.queryset
 
+    def get_serializer_class(self):
+        if self.action in ('create','update','partial_update'):
+            return PayrollBatchLineWriteSerializer
+        return PayrollBatchLineSerializer
+
     def perform_create(self, serializer):
-        batch_pk = self.kwargs.get("batch_pk") or serializer.validated_data["payroll_batch"].pk
-        serializer.save(payroll_batch=batch_pk)
+        batch_pk = self.kwargs.get("batch_pk")
+        batch = get_object_or_404(PayrollBatch, pk=batch_pk) 
+        serializer.save(payroll_batch=batch)
         recalc_single_line(serializer.instance.id)
+        serializer.instance.refresh_from_db()
     
     def perform_update(self, serializer):
         line = serializer.save()

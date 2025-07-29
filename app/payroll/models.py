@@ -151,21 +151,21 @@ class PayrollBatchLine(models.Model):
     # Input fields
     payroll_batch = models.ForeignKey(PayrollBatch, on_delete=models.CASCADE)
     date = models.DateField()
-    iso_year = models.PositiveSmallIntegerField(editable=False)
-    iso_week = models.PositiveSmallIntegerField(editable=False)
     field_worker = models.ForeignKey(FieldWorker, on_delete=models.CASCADE)
     activity = models.ForeignKey(Activity, on_delete=models.CASCADE)
     quantity = models.DecimalField(max_digits=10, decimal_places=2)
+    iso_week = models.PositiveSmallIntegerField(editable=False)
+    iso_year = models.PositiveSmallIntegerField(editable=False)
 
     # Output calculation fields
-    total_cost = models.DecimalField(max_digits=10, decimal_places=2)
-    salary_surplus = models.DecimalField(max_digits=10, decimal_places=2)
-    integral_bonus = models.DecimalField(max_digits=10, decimal_places=2)
-    mobilization_bonus = models.DecimalField(max_digits=10, decimal_places=2)
-    extra_hours_value = models.DecimalField(max_digits=10, decimal_places=2)
-    extra_hours_qty = models.DecimalField(max_digits=10, decimal_places=2)
-    thirteenth_bonus = models.DecimalField(max_digits=10, decimal_places=2)
-    fourteenth_bonus = models.DecimalField(max_digits=10, decimal_places=2)
+    total_cost = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
+    salary_surplus = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
+    integral_bonus = models.DecimalField(max_digits=10, decimal_places=2,null=True, blank=True)
+    mobilization_bonus = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
+    extra_hours_value = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
+    extra_hours_qty = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
+    thirteenth_bonus = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
+    fourteenth_bonus = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
 
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -193,4 +193,6 @@ class PayrollConfiguration(models.Model):
     """Payroll configuration"""
     mobilization_percentage = models.DecimalField(max_digits=10, decimal_places=2)
     extra_hours_percentage = models.DecimalField(max_digits=10, decimal_places=2)
+    extra_hour_value = models.DecimalField(max_digits=10, decimal_places=2)
     basic_monthly_wage = models.DecimalField(max_digits=10, decimal_places=2)
+    daily_payroll_line_worker_limit = models.PositiveSmallIntegerField(default=3)

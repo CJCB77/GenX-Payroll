@@ -1,5 +1,5 @@
 from django.urls import path, include
-from rest_framework.routers import SimpleRouter
+from rest_framework_nested.routers import SimpleRouter, NestedSimpleRouter
 from .views import (
     SyncEmployeeHook, 
     SyncContractHook,
@@ -12,7 +12,8 @@ from .views import (
     LaborTypeViewSet,
     TariffViewSet,
     PayrollBatchViewSet,
-    PayrollConfigurationView
+    PayrollConfigurationView,
+    PayrollBatchLineViewSet,
 )
 
 router = SimpleRouter(trailing_slash=False)
@@ -24,6 +25,10 @@ router.register(r"labor-types", LaborTypeViewSet, basename="labor-type")
 router.register(r"tariffs", TariffViewSet, basename="tariff")
 router.register(r"payroll-batches", PayrollBatchViewSet, basename="payroll-batch")
 
+# Nested
+batch_router = NestedSimpleRouter(router, r"payroll-batches", lookup="batch")
+batch_router.register(r"payroll-lines", PayrollBatchLineViewSet, basename="payroll-line")
+
 app_name = "payroll"
 
 urlpatterns = [
@@ -33,4 +38,5 @@ urlpatterns = [
     path("fieldworkers/<int:pk>", FieldWorkerDetailView.as_view(), name="fieldworker-detail"),
     path("configuration", PayrollConfigurationView.as_view(), name="configuration"),
     path("", include(router.urls)),
+    path("", include(batch_router.urls)),
 ]

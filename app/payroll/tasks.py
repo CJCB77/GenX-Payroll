@@ -4,6 +4,9 @@ from celery import shared_task
 from logging import getLogger
 from .models import FieldWorker
 from datetime import datetime
+from .services import (
+    compute_line_totals
+)
 
 from payroll.models import (
     PayrollBatchLine
@@ -137,15 +140,16 @@ def recalc_single_line(line_id):
     line = PayrollBatchLine.objects.get(id=line_id)
     # Get totals
     cost, surplus = compute_line_totals(line)
+    logger.info(f"Cost: {cost}, Surplus: {surplus}")
     line.total_cost = cost
     line.salary_surplus = surplus
-    # Get mobilization and extra hours
-    mobilization, extra_hours, extra_hours_qty = compute_mobilization_and_extra_hours(line)
-    line.mobilization_bonus = mobilization
-    line.extra_hours_value = extra_hours
-    line.extra_hours_qty = extra_hours_qty
+    # # Get mobilization and extra hours
+    # mobilization, extra_hours, extra_hours_qty = compute_mobilization_and_extra_hours(line)
+    # line.mobilization_bonus = mobilization
+    # line.extra_hours_value = extra_hours
+    # line.extra_hours_qty = extra_hours_qty
 
-    # Get social benefits
-    line.thirteenth_bonus = compute_thirteenth_bonus(line)
-    line.fourteenth_bonus = compute_fourteenth_bonus(line)
+    # # Get social benefits
+    # line.thirteenth_bonus = compute_thirteenth_bonus(line)
+    # line.fourteenth_bonus = compute_fourteenth_bonus(line)
     line.save()

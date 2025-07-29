@@ -96,7 +96,43 @@ class PayrollConfigurationSerializer(serializers.ModelSerializer):
             "basic_monthly_wage",
         ]
 
+class PayrollBatchLineWriteSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = PayrollBatchLine
+        fields = [
+            'id',
+            'date',
+            'field_worker', 
+            'activity', 
+            'quantity',
+            'total_cost',
+            'salary_surplus',
+            'integral_bonus',
+            'mobilization_bonus',
+            'extra_hours_value',
+            'extra_hours_qty',
+            'thirteenth_bonus',
+            'fourteenth_bonus', 
+        ]
+        read_only_fields = [
+            'id',
+            'created_at',
+            'updated_at',
+            'total_cost',
+            'salary_surplus',
+            'integral_bonus',
+            'mobilization_bonus',
+            'extra_hours_value',
+            'extra_hours_qty',
+            'thirteenth_bonus',
+            'fourteenth_bonus',
+        ]
+
 class PayrollBatchLineSerializer(serializers.ModelSerializer):
+    payroll_batch = PayrollBatchSerializer(read_only=True)
+    field_worker = FieldWorkerListSerializer(read_only=True)
+    activity = ActivityDetailSerializer(read_only=True)
+
     class Meta:
         model = PayrollBatchLine
         fields = [
