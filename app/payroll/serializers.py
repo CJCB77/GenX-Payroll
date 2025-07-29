@@ -8,6 +8,7 @@ from .models import (
     Farm,
     Tariff,
     PayrollBatch,
+    PayrollBatchLine, 
     PayrollConfiguration,
 )
 
@@ -83,7 +84,7 @@ class TariffSerializer(serializers.ModelSerializer):
 class PayrollBatchSerializer(serializers.ModelSerializer):
     class Meta:
         model = PayrollBatch
-        fields = ['id','name', 'start_date', 'end_date', 'status']
+        fields = ['id','name', 'start_date', 'end_date', 'status', 'farm']
         read_only_fields = ['id', 'created_at', 'updated_at']
 
 class PayrollConfigurationSerializer(serializers.ModelSerializer):
@@ -93,4 +94,38 @@ class PayrollConfigurationSerializer(serializers.ModelSerializer):
             "mobilization_percentage",
             "extra_hours_percentage",
             "basic_monthly_wage",
+        ]
+
+class PayrollBatchLineSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = PayrollBatchLine
+        fields = [
+            'id', 
+            'payroll_batch', 
+            'field_worker', 
+            'date',
+            'iso_week', 
+            'activity', 
+            'quantity', 
+            'total_cost', 
+            'salary_surplus', 
+            'integral_bonus', 
+            'mobilization_bonus', 
+            'extra_hours_value', 
+            'extra_hours_qty', 
+            'thirteenth_bonus', 
+            'fourteenth_bonus',
+        ]
+        read_only_fields = [
+            'id', 
+            'created_at', 
+            'updated_at',
+            'total_cost',
+            'salary_surplus',
+            'integral_bonus',
+            'mobilization_bonus',
+            'extra_hours_value',
+            'extra_hours_qty',
+            'thirteenth_bonus',
+            'fourteenth_bonus',
         ]

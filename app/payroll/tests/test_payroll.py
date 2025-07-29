@@ -5,8 +5,10 @@ from core.tests import AuthenticatedAPITestCase
 from payroll.models import (
     PayrollConfiguration,
     PayrollBatch,
+    Farm,
 )
 from decimal import Decimal
+from datetime import date
 
 import logging
 
@@ -55,18 +57,24 @@ class PayrollBatchApiTests(AuthenticatedAPITestCase):
     def setUp(self):
         super().setUp()
         self.list_url = reverse("payroll:payroll-batch-list")
+        self.farm = Farm.objects.create(
+            name="Test Farm",
+            code="TSTF",
+        )
 
         # Seed some batches with differen statuses
         self.pb1 = PayrollBatch.objects.create(
             name="Test Payroll Batch 1", 
-            start_date = "2025-06-30",
-            end_date = "2025-07-14",
+            start_date = date(2025, 7, 1),
+            end_date = date(2025, 7, 14),
             status="submitted",
+            farm=self.farm
         )
         self.pb2 = PayrollBatch.objects.create(
             name="Test Payroll Batch 2", 
-            start_date = "2025-07-14",
-            end_date = "2025-07-28",
+            start_date = date(2025, 7, 15),
+            end_date = date(2025, 7, 28),
+            farm=self.farm
         )
     
     def test_list_all_batches(self):
@@ -94,8 +102,9 @@ class PayrollBatchApiTests(AuthenticatedAPITestCase):
     def test_create_batch(self):
         payload = {
             "name": "Test Payroll Batch 3",
-            "start_date": "2025-08-01",
-            "end_date": "2025-08-15",
+            "start_date": date(2025, 8, 1),
+            "end_date": date(2025, 8, 14),
+            "farm": self.farm.id,
         }
         res = self.client.post(self.list_url, payload, format="json")
         self.assertEqual(res.status_code, status.HTTP_201_CREATED)

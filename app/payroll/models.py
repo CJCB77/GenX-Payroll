@@ -133,6 +133,7 @@ class PayrollBatch(models.Model):
     ]
 
     name = models.CharField(max_length=255, unique=True)
+    farm = models.ForeignKey(Farm, on_delete=models.CASCADE)
     start_date = models.DateField()
     end_date = models.DateField()
     iso_year = models.PositiveSmallIntegerField(null=True, blank=True, db_index=True)

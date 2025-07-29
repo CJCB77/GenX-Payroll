@@ -1,5 +1,5 @@
 from django_filters import rest_framework as filters
-from .models import FieldWorker
+from .models import FieldWorker, PayrollBatchLine
 
 
 class FieldWorkerFilter(filters.FilterSet):
@@ -29,4 +29,32 @@ class FieldWorkerFilter(filters.FilterSet):
             'email',
             'contract_status',
             'is_active',
+        ]
+
+class PayrollLineFilter(filters.FilterSet):
+    """
+    Custom payroll line filter class for advanced filtering options
+    """
+    # Date range
+    date__gte = filters.DateFilter(field_name="date", lookup_expr="gte")
+    date__lte = filters.DateFilter(field_name="date", lookup_expr="lte")
+    # Worker, activity, batch
+    field_worker__id = filters.CharFilter(field_name="field_worker__identification_number", lookup_expr="icontains")
+    field_worker__name = filters.CharFilter(field_name="field_worker__name", lookup_expr="icontains")
+    activity__name = filters.CharFilter(field_name="activity__name", lookup_expr="icontains")
+    payroll_batch__name = filters.CharFilter(field_name="payroll_batch__name", lookup_expr="icontains")
+
+    #Numerics ranges for computed fields
+    total_cost__gte = filters.NumberFilter(field_name="total_cost", lookup_expr="gte")
+    total_cost__lte = filters.NumberFilter(field_name="total_cost", lookup_expr="lte")
+    integral_bonus__gte = filters.NumberFilter(field_name="integral_bonus", lookup_expr="gte")
+    integral_bonus__lte = filters.NumberFilter(field_name="integral_bonus", lookup_expr="lte")
+
+    class Meta:
+        model = PayrollBatchLine
+        fields = [
+            'date',
+            'iso_week',
+            'activity',
+            'payroll_batch',
         ]

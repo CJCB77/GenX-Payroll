@@ -5,6 +5,10 @@ from logging import getLogger
 from .models import FieldWorker
 from datetime import datetime
 
+from payroll.models import (
+    PayrollBatchLine
+)
+
 logger = getLogger(__name__)
 
 @shared_task(bind=True, max_retries=3, default_retry_delay=30)
@@ -125,3 +129,23 @@ def sync_contract(self, payload):
     except Exception as e:
         logger.error(f"Error syncing employee: {e}")
         raise self.retry(exc=e)
+
+def recalc_single_line(line_id):
+    """
+    Called on create or update of a line: recomputes costs, bonuses, etc
+    """
+    line = PayrollBatchLine.objects.get(id=line_id)
+    # Get totals
+    cost, surplus = compute_line_totals(line)
+    line.total_cost = cost
+    line.salary_surplus = surplus
+    # Get mobilization and extra hours
+    mobilization, extra_hours, extra_hours_qty = compute_mobilization_and_extra_hours(line)
+    line.mobilization_bonus = mobilization
+    line.extra_hours_value = extra_hours
+    line.extra_hours_qty = extra_hours_qty
+
+    # Get social benefits
+    line.thirteenth_bonus = compute_thirteenth_bonus(line)
+    line.fourteenth_bonus = compute_fourteenth_bonus(line)
+    line.save()

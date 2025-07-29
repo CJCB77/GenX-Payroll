@@ -14,7 +14,8 @@ from .models import (
     Uom,
     Tariff,
     PayrollBatch,
-    PayrollConfiguration
+    PayrollConfiguration,
+    PayrollBatchLine
 )
 from .serializers import (
     FieldWorkerListSerializer,
@@ -26,11 +27,14 @@ from .serializers import (
     UomSerializer,
     PayrollBatchSerializer,
     PayrollConfigurationSerializer,
-    TariffSerializer
+    TariffSerializer,
+    PayrollBatchLineSerializer
 )
 from .filters import (
     FieldWorkerFilter,
+    PayrollLineFilter
 )
+from .tasks import recalc_single_line
 from logging import getLogger
 
 logger = getLogger(__name__)
@@ -162,3 +166,33 @@ class PayrollConfigurationView(generics.RetrieveUpdateAPIView):
             }
         )
         return obj
+
+class PayrollBatchLineViewSet(viewsets.ModelViewSet):
+    """
+    - GET /api/payroll-lines/ → returns all lines
+    - GET /api/payroll-batches/<batch_pk>/payroll-lines/ → returns lines for a specific batch
+    - POST /api/payroll-batches/<batch_pk>/payroll-lines/ → creates a new line
+    - PATCH /api/payroll-batches/<batch_pk>/payroll-lines/<pk>/ → updates a line & recalculates
+    - DELETE /api/payroll-batches/<batch_pk>/payroll-lines/<pk>/ → deletes a line
+    - POST /api/payroll-batches/<batch_pk>/payroll-lines/batch-import/ → uploads a CSV/XLSX
+    """
+    queryset = PayrollBatchLine.objects.select_related("payroll_batch", "field_worker", "activity")
+    filterset_class = PayrollLineFilter
+    serializer_class = PayrollBatchLineSerializer
+
+    def get_queryset(self):
+        # If nested under a batch, filter by that batch
+        batch_pk = self.kwargs.get("batch_pk")
+        if batch_pk:
+            return self.queryset.filter(payroll_batch=batch_pk)
+        return self.queryset
+
+    def perform_create(self, serializer):
+        batch_pk = self.kwargs.get("batch_pk") or serializer.validated_data["payroll_batch"].pk
+        serializer.save(payroll_batch=batch_pk)
+        recalc_single_line(serializer.instance.id)
+    
+    def perform_update(self, serializer):
+        line = serializer.save()
+        # When a line is updated, recalculate
+        recalc_single_line(line.id)
