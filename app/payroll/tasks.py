@@ -139,15 +139,14 @@ def recalc_single_line(line_id):
     """
     line = PayrollBatchLine.objects.get(id=line_id)
     # Get totals
-    cost, surplus = compute_line_totals(line)
-    logger.info(f"Cost: {cost}, Surplus: {surplus}")
-    line.total_cost = cost
-    line.salary_surplus = surplus
-    # # Get mobilization and extra hours
-    # mobilization, extra_hours, extra_hours_qty = compute_mobilization_and_extra_hours(line)
-    # line.mobilization_bonus = mobilization
-    # line.extra_hours_value = extra_hours
-    # line.extra_hours_qty = extra_hours_qty
+    calculations = compute_line_totals(line)
+    logger.info(f"Calculations: {calculations}")
+    line.total_cost = calculations.get("total_cost", 0)
+    line.salary_surplus = calculations.get("surplus", 0)
+    # Get mobilization and extra hours
+    line.mobilization_bonus = calculations.get("mobilization", 0)
+    line.extra_hours_value = calculations.get("extra_hours", 0)
+    line.extra_hours_qty = calculations.get("extra_hours_qty", 0)
 
     # # Get social benefits
     # line.thirteenth_bonus = compute_thirteenth_bonus(line)

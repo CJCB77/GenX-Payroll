@@ -1,3 +1,4 @@
+from decimal import Decimal
 from django.db import models
 from django.utils import timezone
 from django.conf import settings
@@ -189,10 +190,48 @@ class PayrollBatchLine(models.Model):
             )
         ]
 
+class PayrollConfigurationManager(models.Manager):
+    def get_config(self):
+        """
+        Get the singleton config instance
+        """
+        config, _ = self.get_or_create(
+            pk=1,
+            defaults={
+                "mobilization_percentage": Decimal(0.0),
+                "extra_hours_percentage": Decimal(0.0),
+                "basic_monthly_wage": Decimal(0.0),
+                "extra_hour_multiplier": Decimal(0.0),
+                "daily_payroll_line_worker_limit": 3
+            }
+        )
+        return config
+
 class PayrollConfiguration(models.Model):
     """Payroll configuration"""
+    # Prevent multiple instances
+    id = models.AutoField(primary_key=True)
+
     mobilization_percentage = models.DecimalField(max_digits=10, decimal_places=2)
     extra_hours_percentage = models.DecimalField(max_digits=10, decimal_places=2)
-    extra_hour_value = models.DecimalField(max_digits=10, decimal_places=2)
+    extra_hour_multiplier = models.DecimalField(max_digits=10, decimal_places=2)
     basic_monthly_wage = models.DecimalField(max_digits=10, decimal_places=2)
     daily_payroll_line_worker_limit = models.PositiveSmallIntegerField(default=3)
+
+    objects = PayrollConfigurationManager()
+
+    def save(self, *args, **kwags):
+        # Ensure only one instance exists
+        self.pk = 1
+        super().save(*args, **kwags)
+
+    def delete(self, *args, **kwags):
+        # Prevent deletion
+        pass
+
+    @classmethod
+    def get_config(cls):
+        return cls.objects.get_config()
+
+    def __str__(self):
+        return "Payroll Configuration"
