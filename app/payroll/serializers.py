@@ -102,6 +102,8 @@ class PayrollBatchLineWriteSerializer(serializers.ModelSerializer):
         fields = [
             'id',
             'date',
+            'iso_week',
+            'iso_year',
             'field_worker', 
             'activity', 
             'quantity',
@@ -118,6 +120,8 @@ class PayrollBatchLineWriteSerializer(serializers.ModelSerializer):
             'id',
             'created_at',
             'updated_at',
+            'iso_year',
+            'iso_week',
             'total_cost',
             'salary_surplus',
             'integral_bonus',

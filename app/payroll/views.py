@@ -165,7 +165,7 @@ class PayrollConfigurationView(generics.RetrieveUpdateAPIView):
                 "mobilization_percentage": 0.0,
                 "extra_hours_percentage": 0.0,
                 "basic_monthly_wage": 0.0,
-                "extra_hour_value": 0.0
+                "extra_hour_multiplier": 0.0
             }
         )
         return obj

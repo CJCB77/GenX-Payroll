@@ -374,6 +374,21 @@ class PayrollBatchLineAPITests(AuthenticatedAPITestCase):
 
         self.assertEqual(Decimal(res.data["total_cost"]), Decimal('20.00'))
     
+    def test_payroll_line_is_saved_with_iso_week_and_year(self):
+        url = self._get_payroll_lines_urL_by_batch(self.payroll_batch.pk)
+
+        payload = {
+            "field_worker": self.fw2.pk,
+            "date": date(2025, 7, 1),
+            "activity": self.work_activity1.pk,
+            "quantity": 10,
+        }
+        res = self.client.post(url, payload, format="json")
+        self.assertEqual(res.status_code, status.HTTP_201_CREATED)
+
+        self.assertEqual(res.data["iso_week"], 27)
+        self.assertEqual(res.data["iso_year"], 2025)
+    
     def test_surplus_is_calculated_on_creation(self):
         url = self._get_payroll_lines_urL_by_batch(self.payroll_batch.pk)
 
@@ -437,7 +452,10 @@ class PayrollBatchLineAPITests(AuthenticatedAPITestCase):
         res = self.client.post(url, payload, format="json")
         self.assertEqual(res.status_code, status.HTTP_201_CREATED)
 
-        self.assertEqual(Decimal(res.data["thirteenth_bonus"]), Decimal(daily_thirteenth_bonus))
+        self.assertEqual(
+            Decimal(res.data["thirteenth_bonus"]), 
+            Decimal(daily_thirteenth_bonus).quantize(Decimal('0.01'))
+        )
     
     def test_fourteenth_bonus_is_calculated_on_creation(self):
         url = self._get_payroll_lines_urL_by_batch(self.payroll_batch.pk)
@@ -455,7 +473,10 @@ class PayrollBatchLineAPITests(AuthenticatedAPITestCase):
         res = self.client.post(url, payload, format="json")
         self.assertEqual(res.status_code, status.HTTP_201_CREATED)
 
-        self.assertEqual(Decimal(res.data["fourteenth_bonus"]), Decimal(daily_fourteenth_bonus))
+        self.assertEqual(
+            Decimal(res.data["fourteenth_bonus"]), 
+            Decimal(daily_fourteenth_bonus).quantize(Decimal('0.01'))
+        )
     
     def test_correct_integral_bonus_calculation(self):
         """
@@ -512,13 +533,14 @@ class PayrollBatchLineAPITests(AuthenticatedAPITestCase):
         res = self.client.post(url, payload, format='json')
         self.assertEqual(res.status_code, status.HTTP_201_CREATED)
 
-        self.assertEqual(Decimal(res.data["integral_bonus"]), Decimal(fw1_daily_wage / 5))
+        self.assertEqual(Decimal(res.data["integral_bonus"]), Decimal((fw1_daily_wage * 2) / 5))
 
         # Lets check that the other payroll lines related to the fw1
         # for this week should distribute evenly the integral bonus
-        res = self.get(url + f"?field_worker={self.fw1.pk}")
+        res = self.client.get(url + f"?field_worker__name={self.fw1.name}")
+        logger.info(f"Payroll lines for fw1: {res.data}")
         for line in res.data["results"]:
-            self.assertEqual(Decimal(line["integral_bonus"]), Decimal(fw1_daily_wage / 5))
+            self.assertEqual(Decimal(line["integral_bonus"]), Decimal((fw1_daily_wage * 2) / 5))
     
     def test_calcs_distributed_proportionally_for_same_day_records(self):
         """

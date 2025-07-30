@@ -161,12 +161,18 @@ class PayrollBatchLine(models.Model):
     # Output calculation fields
     total_cost = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
     salary_surplus = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
-    integral_bonus = models.DecimalField(max_digits=10, decimal_places=2,null=True, blank=True)
-    mobilization_bonus = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
-    extra_hours_value = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
-    extra_hours_qty = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
-    thirteenth_bonus = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
-    fourteenth_bonus = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
+    integral_bonus = models.DecimalField(max_digits=10, decimal_places=2,
+                                         null=True, blank=True, default=Decimal(0.00))
+    mobilization_bonus = models.DecimalField(max_digits=10, decimal_places=2, 
+                                             null=True, blank=True, default=Decimal(0.00))
+    extra_hours_value = models.DecimalField(max_digits=10, decimal_places=2, 
+                                            null=True, blank=True, default=Decimal(0.00))
+    extra_hours_qty = models.DecimalField(max_digits=10, decimal_places=2, 
+                                          null=True, blank=True, default=Decimal(0.00))
+    thirteenth_bonus = models.DecimalField(max_digits=10, decimal_places=2, 
+                                           null=True, blank=True, default=Decimal(0.00))
+    fourteenth_bonus = models.DecimalField(max_digits=10, decimal_places=2, 
+                                           null=True, blank=True, default=Decimal(0.00))
 
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -185,7 +191,7 @@ class PayrollBatchLine(models.Model):
         ]
         constraints = [
             models.UniqueConstraint(
-                fields = ['payroll_batch', 'field_worker', 'activity'],
+                fields = ['field_worker', 'activity', 'date'],
                 name = 'unique_payroll_batch_line',
             )
         ]

@@ -5,7 +5,8 @@ from logging import getLogger
 from .models import FieldWorker
 from datetime import datetime
 from .services import (
-    compute_line_totals
+    compute_inline_calculations,
+    compute_weekly_integral_for_worker
 )
 
 from payroll.models import (
@@ -132,6 +133,13 @@ def sync_contract(self, payload):
     except Exception as e:
         logger.error(f"Error syncing employee: {e}")
         raise self.retry(exc=e)
+    
+def recalc_week_for_worker(worker, payroll_batch):
+    """
+    Called on create or update of a payroll line: recomputes week bonuses
+    """
+    compute_weekly_integral_for_worker(worker, payroll_batch)
+    
 
 def recalc_single_line(line_id):
     """
@@ -139,8 +147,7 @@ def recalc_single_line(line_id):
     """
     line = PayrollBatchLine.objects.get(id=line_id)
     # Get totals
-    calculations = compute_line_totals(line)
-    logger.info(f"Calculations: {calculations}")
+    calculations = compute_inline_calculations(line)
     line.total_cost = calculations.get("total_cost", 0)
     line.salary_surplus = calculations.get("surplus", 0)
     # Get mobilization and extra hours
@@ -149,6 +156,11 @@ def recalc_single_line(line_id):
     line.extra_hours_qty = calculations.get("extra_hours_qty", 0)
 
     # # Get social benefits
-    # line.thirteenth_bonus = compute_thirteenth_bonus(line)
-    # line.fourteenth_bonus = compute_fourteenth_bonus(line)
+    line.thirteenth_bonus = calculations.get("thirteenth_bonus", 0)
+    line.fourteenth_bonus = calculations.get("fourteenth_bonus", 0)
+
     line.save()
+
+    # Week-level recalculation
+    recalc_week_for_worker(line.field_worker,line.payroll_batch)
+
