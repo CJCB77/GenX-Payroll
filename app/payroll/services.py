@@ -1,3 +1,4 @@
+from django.db.models import Sum
 from decimal import Decimal
 from .models import (
     PayrollBatchLine,
@@ -50,13 +51,11 @@ def calculate_fourteenth_bonus(worker):
 def compute_inline_calculations(line: PayrollBatchLine):
     worker = line.field_worker
     daily_wage = worker.wage / Decimal(30)
-    logger.info(f"Daily wage: {daily_wage}")
     try:
         tariff = Tariff.objects.get(activity= line.activity, farm = line.payroll_batch.farm)
         tariff_price = tariff.cost_per_unit
     except Tariff.DoesNotExist:
         tariff_price = 0
-    logger.info(f"Tariff price: {tariff_price}")
     total_cost = line.quantity * tariff_price
     surplus = max(Decimal(0), total_cost - daily_wage)
 
@@ -67,9 +66,9 @@ def compute_inline_calculations(line: PayrollBatchLine):
 
     return {
         "total_cost": total_cost,
-        "surplus": surplus,
-        "mobilization": mobilization,
-        "extra_hours": extra_hours,
+        "salary_surplus": surplus,
+        "mobilization_bonus": mobilization,
+        "extra_hours_value": extra_hours,
         "extra_hours_qty": extra_hours_qty,
         "thirteenth_bonus": thirteenth_bonus,
         "fourteenth_bonus": fourthteenth_bonus,
@@ -102,6 +101,28 @@ def compute_weekly_integral_for_worker(worker, payroll_batch):
             line.integral_bonus = Decimal(distributed_integral_bonus)
             line.save()
             
+def distribute_proportionally_same_day_for_worker(worker, payroll_batch, date):
+    """
+    If a worker has more than one line for the same day, distribute calculations proportionally
+    """
+    fw_daily_wage = worker.wage / DAYS_OF_THE_MONTH
+    # Get all lines for this worker's day
+    fw_lines = PayrollBatchLine.objects.filter(
+        payroll_batch=payroll_batch,
+        date=date,
+        field_worker=worker
+    )
+    lines_total_cost = fw_lines.aggregate(total_cost=Sum('total_cost'))['total_cost']
+    total_salary_surplus = lines_total_cost - fw_daily_wage
+    for line in fw_lines:
+        proportion = line.total_cost / lines_total_cost
+        line.salary_surplus = total_salary_surplus * proportion
+        line.mobilization_bonus = calculate_mobilization(line.salary_surplus)
+        line.extra_hours_value, line.extra_hours_qty = calculate_extra_hours(line.salary_surplus, worker)
+        line.thirteenth_bonus = calculate_thirteenth_bonus(worker) * proportion
+        line.fourteenth_bonus = calculate_fourteenth_bonus(worker) * proportion
+        line.integral_bonus = line.integral_bonus * proportion
+        line.save()
 
     
 

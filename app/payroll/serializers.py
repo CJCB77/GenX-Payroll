@@ -12,6 +12,10 @@ from .models import (
     PayrollConfiguration,
 )
 
+import logging
+
+logger = logging.getLogger(__name__)
+
 class FieldWorkerDetailSerializer(serializers.ModelSerializer):
     """
     Serializer for field worker details
@@ -94,6 +98,8 @@ class PayrollConfigurationSerializer(serializers.ModelSerializer):
             "mobilization_percentage",
             "extra_hours_percentage",
             "basic_monthly_wage",
+            "extra_hour_multiplier",
+            "daily_payroll_line_worker_limit",
         ]
 
 class PayrollBatchLineWriteSerializer(serializers.ModelSerializer):
@@ -131,6 +137,28 @@ class PayrollBatchLineWriteSerializer(serializers.ModelSerializer):
             'thirteenth_bonus',
             'fourteenth_bonus',
         ]
+    
+    def validate(self, attrs):
+        attrs = super().validate(attrs)
+        # Check how many configs are available
+        config = PayrollConfiguration.objects.all().first()
+        # Check daily limit 
+        daily_limit = PayrollConfiguration.objects.get_config().daily_payroll_line_worker_limit
+        if daily_limit and daily_limit > 0:
+            qs = PayrollBatchLine.objects.filter(
+                field_worker=attrs['field_worker'],
+                date=attrs['date']
+            )
+
+            # If updating an existing line, exclude itself
+            if self.instance:
+                qs = qs.exclude(pk=self.instance.pk)
+            
+            if qs.count() >= daily_limit:
+                raise serializers.ValidationError({
+                    'daily_limit': f"Daily limit of {daily_limit} lines per worker has been reached."
+                })
+        return attrs
 
 class PayrollBatchLineSerializer(serializers.ModelSerializer):
     payroll_batch = PayrollBatchSerializer(read_only=True)

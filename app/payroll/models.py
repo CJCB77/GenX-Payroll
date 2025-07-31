@@ -1,8 +1,55 @@
 from decimal import Decimal
 from django.db import models
+from django.forms import ValidationError
 from django.utils import timezone
 from django.conf import settings
 
+
+class PayrollConfigurationManager(models.Manager):
+    def get_config(self):
+        """
+        Get the singleton config instance
+        """
+        config, _ = self.get_or_create(
+            pk=1,
+            defaults={
+                "mobilization_percentage": Decimal(0.0),
+                "extra_hours_percentage": Decimal(0.0),
+                "basic_monthly_wage": Decimal(0.0),
+                "extra_hour_multiplier": Decimal(0.0),
+                "daily_payroll_line_worker_limit": 3
+            }
+        )
+        return config
+
+class PayrollConfiguration(models.Model):
+    """Payroll configuration"""
+    # Prevent multiple instances
+    id = models.AutoField(primary_key=True)
+
+    mobilization_percentage = models.DecimalField(max_digits=10, decimal_places=2)
+    extra_hours_percentage = models.DecimalField(max_digits=10, decimal_places=2)
+    extra_hour_multiplier = models.DecimalField(max_digits=10, decimal_places=2)
+    basic_monthly_wage = models.DecimalField(max_digits=10, decimal_places=2)
+    daily_payroll_line_worker_limit = models.PositiveSmallIntegerField(default=3)
+
+    objects = PayrollConfigurationManager()
+
+    def save(self, *args, **kwags):
+        # Ensure only one instance exists
+        self.pk = 1
+        super().save(*args, **kwags)
+
+    def delete(self, *args, **kwags):
+        # Prevent deletion
+        pass
+
+    @classmethod
+    def get_config(cls):
+        return cls.objects.get_config()
+
+    def __str__(self):
+        return "Payroll Configuration"
 
 class FieldWorker(models.Model):
     odoo_employee_id = models.IntegerField(unique=True, db_index=True)
@@ -154,25 +201,25 @@ class PayrollBatchLine(models.Model):
     date = models.DateField()
     field_worker = models.ForeignKey(FieldWorker, on_delete=models.CASCADE)
     activity = models.ForeignKey(Activity, on_delete=models.CASCADE)
-    quantity = models.DecimalField(max_digits=10, decimal_places=2)
+    quantity = models.DecimalField(max_digits=10, decimal_places=3)
     iso_week = models.PositiveSmallIntegerField(editable=False)
     iso_year = models.PositiveSmallIntegerField(editable=False)
 
     # Output calculation fields
-    total_cost = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
-    salary_surplus = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
-    integral_bonus = models.DecimalField(max_digits=10, decimal_places=2,
-                                         null=True, blank=True, default=Decimal(0.00))
-    mobilization_bonus = models.DecimalField(max_digits=10, decimal_places=2, 
+    total_cost = models.DecimalField(max_digits=10, decimal_places=3, null=True, blank=True)
+    salary_surplus = models.DecimalField(max_digits=10, decimal_places=3, null=True, blank=True)
+    mobilization_bonus = models.DecimalField(max_digits=10, decimal_places=3, 
                                              null=True, blank=True, default=Decimal(0.00))
-    extra_hours_value = models.DecimalField(max_digits=10, decimal_places=2, 
+    extra_hours_value = models.DecimalField(max_digits=10, decimal_places=3, 
                                             null=True, blank=True, default=Decimal(0.00))
-    extra_hours_qty = models.DecimalField(max_digits=10, decimal_places=2, 
+    extra_hours_qty = models.DecimalField(max_digits=10, decimal_places=3, 
                                           null=True, blank=True, default=Decimal(0.00))
-    thirteenth_bonus = models.DecimalField(max_digits=10, decimal_places=2, 
+    thirteenth_bonus = models.DecimalField(max_digits=10, decimal_places=3, 
                                            null=True, blank=True, default=Decimal(0.00))
-    fourteenth_bonus = models.DecimalField(max_digits=10, decimal_places=2, 
+    fourteenth_bonus = models.DecimalField(max_digits=10, decimal_places=3, 
                                            null=True, blank=True, default=Decimal(0.00))
+    integral_bonus = models.DecimalField(max_digits=10, decimal_places=3,
+                                         null=True, blank=True, default=Decimal(0.00))
 
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -182,12 +229,29 @@ class PayrollBatchLine(models.Model):
         self.iso_week = week
         self.iso_year = year
         super().save(*args, **kwags)
-  
+    
+    def clean(self):
+        super().clean()
+
+        # Get daily limit from Payroll config
+        daily_limit = PayrollConfiguration.objects.get_config().daily_payroll_line_worker_limit
+
+        if daily_limit and daily_limit > 0:
+            existing_count = PayrollBatchLine.objects.filter(
+                field_worker=self.field_worker,
+                date=self.date,
+                payroll_batch=self.payroll_batch
+            ).exclude(pk=self.pk).count()
+
+            if existing_count >= daily_limit:
+                raise ValidationError(f"Daily limit of {daily_limit} lines per worker has been reached.")
+
 
     class Meta:
         indexes = [
             models.Index(fields=['payroll_batch']),
             models.Index(fields=['field_worker']),
+            models.Index(fields=['date']),
         ]
         constraints = [
             models.UniqueConstraint(
@@ -195,49 +259,3 @@ class PayrollBatchLine(models.Model):
                 name = 'unique_payroll_batch_line',
             )
         ]
-
-class PayrollConfigurationManager(models.Manager):
-    def get_config(self):
-        """
-        Get the singleton config instance
-        """
-        config, _ = self.get_or_create(
-            pk=1,
-            defaults={
-                "mobilization_percentage": Decimal(0.0),
-                "extra_hours_percentage": Decimal(0.0),
-                "basic_monthly_wage": Decimal(0.0),
-                "extra_hour_multiplier": Decimal(0.0),
-                "daily_payroll_line_worker_limit": 3
-            }
-        )
-        return config
-
-class PayrollConfiguration(models.Model):
-    """Payroll configuration"""
-    # Prevent multiple instances
-    id = models.AutoField(primary_key=True)
-
-    mobilization_percentage = models.DecimalField(max_digits=10, decimal_places=2)
-    extra_hours_percentage = models.DecimalField(max_digits=10, decimal_places=2)
-    extra_hour_multiplier = models.DecimalField(max_digits=10, decimal_places=2)
-    basic_monthly_wage = models.DecimalField(max_digits=10, decimal_places=2)
-    daily_payroll_line_worker_limit = models.PositiveSmallIntegerField(default=3)
-
-    objects = PayrollConfigurationManager()
-
-    def save(self, *args, **kwags):
-        # Ensure only one instance exists
-        self.pk = 1
-        super().save(*args, **kwags)
-
-    def delete(self, *args, **kwags):
-        # Prevent deletion
-        pass
-
-    @classmethod
-    def get_config(cls):
-        return cls.objects.get_config()
-
-    def __str__(self):
-        return "Payroll Configuration"

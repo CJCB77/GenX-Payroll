@@ -6,7 +6,8 @@ from .models import FieldWorker
 from datetime import datetime
 from .services import (
     compute_inline_calculations,
-    compute_weekly_integral_for_worker
+    compute_weekly_integral_for_worker,
+    distribute_proportionally_same_day_for_worker
 )
 
 from payroll.models import (
@@ -139,6 +140,12 @@ def recalc_week_for_worker(worker, payroll_batch):
     Called on create or update of a payroll line: recomputes week bonuses
     """
     compute_weekly_integral_for_worker(worker, payroll_batch)
+
+def recalc_day_for_worker(worker, payroll_batch, date):
+    """
+    Called on create or update of a payroll line: recomputes day bonuses
+    """
+    distribute_proportionally_same_day_for_worker(worker, payroll_batch, date)
     
 
 def recalc_single_line(line_id):
@@ -146,20 +153,21 @@ def recalc_single_line(line_id):
     Called on create or update of a line: recomputes costs, bonuses, etc
     """
     line = PayrollBatchLine.objects.get(id=line_id)
-    # Get totals
+    # Get inline totals
     calculations = compute_inline_calculations(line)
-    line.total_cost = calculations.get("total_cost", 0)
-    line.salary_surplus = calculations.get("surplus", 0)
-    # Get mobilization and extra hours
-    line.mobilization_bonus = calculations.get("mobilization", 0)
-    line.extra_hours_value = calculations.get("extra_hours", 0)
-    line.extra_hours_qty = calculations.get("extra_hours_qty", 0)
-
-    # # Get social benefits
-    line.thirteenth_bonus = calculations.get("thirteenth_bonus", 0)
-    line.fourteenth_bonus = calculations.get("fourteenth_bonus", 0)
-
+    for field, value in calculations.items():
+        setattr(line, field, value)
     line.save()
+    
+    # Chekc if day-level recacl is needed
+    same_day_lines_count = PayrollBatchLine.objects.filter(
+        payroll_batch=line.payroll_batch,
+        field_worker=line.field_worker,
+        date=line.date
+    ).count()
+
+    if same_day_lines_count > 1:
+        recalc_day_for_worker(line.field_worker,line.payroll_batch,line.date)
 
     # Week-level recalculation
     recalc_week_for_worker(line.field_worker,line.payroll_batch)

@@ -434,7 +434,7 @@ class PayrollBatchLineAPITests(AuthenticatedAPITestCase):
         self.assertEqual(res.status_code, status.HTTP_201_CREATED)
 
         self.assertEqual(Decimal(res.data["extra_hours_value"]), Decimal('0.80'))
-        self.assertEqual(Decimal(res.data["extra_hours_qty"]), Decimal('0.27'))
+        self.assertEqual(Decimal(res.data["extra_hours_qty"]), Decimal('0.267'))
     
     def test_thirteenth_bonus_is_calculated_on_creation(self):
         url = self._get_payroll_lines_urL_by_batch(self.payroll_batch.pk)
@@ -454,7 +454,7 @@ class PayrollBatchLineAPITests(AuthenticatedAPITestCase):
 
         self.assertEqual(
             Decimal(res.data["thirteenth_bonus"]), 
-            Decimal(daily_thirteenth_bonus).quantize(Decimal('0.01'))
+            Decimal(daily_thirteenth_bonus).quantize(Decimal('0.001'))
         )
     
     def test_fourteenth_bonus_is_calculated_on_creation(self):
@@ -475,7 +475,7 @@ class PayrollBatchLineAPITests(AuthenticatedAPITestCase):
 
         self.assertEqual(
             Decimal(res.data["fourteenth_bonus"]), 
-            Decimal(daily_fourteenth_bonus).quantize(Decimal('0.01'))
+            Decimal(daily_fourteenth_bonus).quantize(Decimal('0.001'))
         )
     
     def test_correct_integral_bonus_calculation(self):
@@ -538,7 +538,6 @@ class PayrollBatchLineAPITests(AuthenticatedAPITestCase):
         # Lets check that the other payroll lines related to the fw1
         # for this week should distribute evenly the integral bonus
         res = self.client.get(url + f"?field_worker__name={self.fw1.name}")
-        logger.info(f"Payroll lines for fw1: {res.data}")
         for line in res.data["results"]:
             self.assertEqual(Decimal(line["integral_bonus"]), Decimal((fw1_daily_wage * 2) / 5))
     
@@ -548,52 +547,66 @@ class PayrollBatchLineAPITests(AuthenticatedAPITestCase):
         the all output calculations should be distributed proportionally
         based on the total activity cost
         """
-        # Create a new line for fw1 for same day of a registered activity
-        # first_line = {
-        #     field_worker=self.fw1,
-        #     payroll_batch=self.payroll_batch,
-        #     activity=self.work_activity2, $2
-        #     date = date(2025, 7, 1),
-        #     quantity = 6,
-        # }
         payload = {
             "field_worker": self.fw1.pk,
-            "date": date(2025, 7, 1),
+            "date": date(2025, 7, 2),
             "activity": self.work_activity1.pk,
             "quantity": 10,
         }
         url = self._get_payroll_lines_urL_by_batch(self.payroll_batch.pk)
-        res = self.client.post(payload, url, format='json')
+        res = self.client.post(url, payload, format='json')
+        self.assertEqual(res.status_code, status.HTTP_201_CREATED)
+
+        # Create a second record for the same day
+        payload = {
+            "field_worker": self.fw1.pk,
+            "date": date(2025, 7, 2),
+            "activity": self.work_activity2.pk,
+            "quantity": 4,
+        }
+        res = self.client.post(url, payload, format='json')
         self.assertEqual(res.status_code, status.HTTP_201_CREATED)
 
         # We need to assert that the output fields are distributed proportionally
         # for each record in the same day
-        res = self.get(url + f"?field_worker={self.fw1.pk}")
+        res = self.client.get(url + f"?field_worker__name={self.fw1.name}&date={date(2025, 7, 2)}")
         self.assertEqual(len(res.data["results"]), 2)
 
         # Compare the total cost
-        self.assertEqual(Decimal(res.data["results"][0]["total_cost"]), Decimal('12.00'))
-        self.assertEqual(Decimal(res.data["results"][1]["total_cost"]), Decimal('20.00'))
+        self.assertEqual(Decimal(res.data["results"][0]["total_cost"]), Decimal('20.00'))
+        self.assertEqual(Decimal(res.data["results"][1]["total_cost"]), Decimal('12.00'))
 
         # Salary surplus distirbution
-        self.assertEqual(Decimal(res.data["results"][0]["surplus"]), Decimal('6.00'))
-        self.assertEqual(Decimal(res.data["results"][1]["surplus"]), Decimal('10.00'))
+        self.assertEqual(Decimal(res.data["results"][0]["salary_surplus"]), Decimal('7.50'))
+        self.assertEqual(Decimal(res.data["results"][1]["salary_surplus"]), Decimal('4.50'))
 
         # Mobilization bonus distribution
-        self.assertEqual(Decimal(res.data["results"][0]["mobilization_bonus"]), Decimal('4.80'))
-        self.assertEqual(Decimal(res.data["results"][1]["mobilization_bonus"]), Decimal('1.20'))
+        self.assertEqual(Decimal(res.data["results"][0]["mobilization_bonus"]), Decimal('6.00'))
+        self.assertEqual(Decimal(res.data["results"][1]["mobilization_bonus"]), Decimal('3.60'))
 
         # Extra hours distribution
-        self.asserEqual(Decimal(res.data["results"][0]["extra_hours"]), Decimal('8.00'))
-        self.assertEqual(Decimal(res.data["results"][1]["extra_hours"]), Decimal('2.00'))
+        self.assertEqual(Decimal(res.data["results"][0]["extra_hours_value"]), Decimal('1.50'))
+        self.assertEqual(Decimal(res.data["results"][1]["extra_hours_value"]), Decimal('0.90'))
 
         # Thirteenth bonus distribution
-        self.assertEqual(Decimal(res.data["results"][0]["thirteenth_bonus"]), Decimal('0.50'))
-        self.assertEqual(Decimal(res.data["results"][1]["thirteenth_bonus"]), Decimal('0.83'))
+        self.assertEqual(
+            Decimal(res.data["results"][0]["thirteenth_bonus"]), 
+            Decimal('1.0416').quantize(Decimal('0.001'))
+        )
+        self.assertEqual(
+            Decimal(res.data["results"][1]["thirteenth_bonus"]), 
+            Decimal('0.625').quantize(Decimal('0.001'))
+        )
 
         # Fourteenth bonus distribution
-        self.assertEqual(Decimal(res.data["results"][0]["fourteenth_bonus"]), Decimal('0.50'))
-        self.assertEqual(Decimal(res.data["results"][1]["fourteenth_bonus"]), Decimal('0.83'))
+        self.assertEqual(
+            Decimal(res.data["results"][0]["fourteenth_bonus"]), 
+            Decimal('0.8333').quantize(Decimal('0.001'))
+        )
+        self.assertEqual(
+            Decimal(res.data["results"][1]["fourteenth_bonus"]), 
+            Decimal('0.5').quantize(Decimal('0.001'))
+        )
 
         # Integral bonus distribution
         self.assertEqual(Decimal(res.data["results"][0]["integral_bonus"]), Decimal('0.00'))
@@ -604,32 +617,43 @@ class PayrollBatchLineAPITests(AuthenticatedAPITestCase):
         Test that the daily payroll line limit is applied per worker
         """
         self.payroll_config.daily_payroll_line_worker_limit = 1
-        # Test that we cannot add any more lines for fw1
-        # as he already has 1 line for the same day
-        payload = {
-            "field_worker": self.fw1.pk,
-            "date": date(2025, 7, 1),
-            "activity": self.work_activity1.pk,
-            "quantity": 10,
-        }
+        self.payroll_config.save()
+        # Get all available configs
         url = self._get_payroll_lines_urL_by_batch(self.payroll_batch.pk)
-        res = self.client.post(payload, url, format='json')
-        self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
-        self.assertIn("Daily payroll line limit reached", str(res.data))
-    
-    def test_daily_limit_allows_different_days(self):
-        """
-        Test that the daily payroll line limit is applied per day and worker
-        """
-        self.payroll_config.daily_payroll_line_worker_limit = 1
-        # Test that we cannot add any more lines for fw1
-        # as he already has 1 line for the same day
+
         payload = {
             "field_worker": self.fw1.pk,
             "date": date(2025, 7, 2),
             "activity": self.work_activity1.pk,
             "quantity": 10,
         }
+        
+        res = self.client.post(url, payload, format='json')
+        self.assertEqual(res.status_code, status.HTTP_201_CREATED)
+
+        # Add another line for the same worker
+        payload = {
+            "field_worker": self.fw1.pk,
+            "date": date(2025, 7, 2),
+            "activity": self.work_activity2.pk,
+            "quantity": 10,
+        }
+        
+        res = self.client.post(url, payload, format='json')
+        self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("Daily limit", str(res.data['daily_limit']))
+    
+    def test_daily_limit_allows_different_days(self):
+        """
+        Test that the daily payroll line limit is applied per day and worker
+        """
+        self.payroll_config.daily_payroll_line_worker_limit = 1
+        payload = {
+            "field_worker": self.fw1.pk,
+            "date": date(2025, 7, 3),
+            "activity": self.work_activity1.pk,
+            "quantity": 10,
+        }
         url = self._get_payroll_lines_urL_by_batch(self.payroll_batch.pk)
-        res = self.client.post(payload, url, format='json')
+        res = self.client.post(url, payload, format='json')
         self.assertEqual(res.status_code, status.HTTP_201_CREATED)
