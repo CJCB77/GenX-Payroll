@@ -36,7 +36,11 @@ from .filters import (
     FieldWorkerFilter,
     PayrollLineFilter
 )
-from .tasks import recalc_single_line
+from .tasks import (
+    recalc_single_line,
+    recalc_same_day_for_worker,
+    recalc_week_for_worker,
+)
 from logging import getLogger
 
 logger = getLogger(__name__)
@@ -196,13 +200,28 @@ class PayrollBatchLineViewSet(viewsets.ModelViewSet):
         return PayrollBatchLineSerializer
 
     def perform_create(self, serializer):
+        # Set the batch from the param
         batch_pk = self.kwargs.get("batch_pk")
         batch = get_object_or_404(PayrollBatch, pk=batch_pk) 
         serializer.save(payroll_batch=batch)
+        # When a line is created, calculate outputs
         recalc_single_line(serializer.instance.id)
         serializer.instance.refresh_from_db()
     
     def perform_update(self, serializer):
+        # Original activity may have changed
+        original_activity = serializer.instance.activity
+
         line = serializer.save()
+        activity_changed = original_activity != line.activity
         # When a line is updated, recalculate
-        recalc_single_line(line.id)
+        recalc_single_line(line.id, recalc_week=activity_changed)
+        serializer.instance.refresh_from_db()
+    
+    def perform_destroy(self, instance):
+        # Get the week the line that was deleted
+        line = instance
+        logger.info(f"Deleting line {line.id}")
+        super().perform_destroy(instance)
+        recalc_same_day_for_worker(line.field_worker,line.payroll_batch,line.date)
+        recalc_week_for_worker(line.field_worker,line.payroll_batch)

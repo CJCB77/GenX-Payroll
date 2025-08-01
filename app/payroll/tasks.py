@@ -7,7 +7,7 @@ from datetime import datetime
 from .services import (
     compute_inline_calculations,
     compute_weekly_integral_for_worker,
-    distribute_proportionally_same_day_for_worker
+    recalc_same_day_for_worker
 )
 
 from payroll.models import (
@@ -141,14 +141,7 @@ def recalc_week_for_worker(worker, payroll_batch):
     """
     compute_weekly_integral_for_worker(worker, payroll_batch)
 
-def recalc_day_for_worker(worker, payroll_batch, date):
-    """
-    Called on create or update of a payroll line: recomputes day bonuses
-    """
-    distribute_proportionally_same_day_for_worker(worker, payroll_batch, date)
-    
-
-def recalc_single_line(line_id):
+def recalc_single_line(line_id, recalc_week=True):
     """
     Called on create or update of a line: recomputes costs, bonuses, etc
     """
@@ -159,7 +152,7 @@ def recalc_single_line(line_id):
         setattr(line, field, value)
     line.save()
     
-    # Chekc if day-level recacl is needed
+    # Check if day-level recalc is needed
     same_day_lines_count = PayrollBatchLine.objects.filter(
         payroll_batch=line.payroll_batch,
         field_worker=line.field_worker,
@@ -167,8 +160,9 @@ def recalc_single_line(line_id):
     ).count()
 
     if same_day_lines_count > 1:
-        recalc_day_for_worker(line.field_worker,line.payroll_batch,line.date)
+        recalc_same_day_for_worker(line.field_worker,line.payroll_batch,line.date)
 
     # Week-level recalculation
-    recalc_week_for_worker(line.field_worker,line.payroll_batch)
+    if recalc_week:
+        recalc_week_for_worker(line.field_worker,line.payroll_batch)
 

@@ -259,3 +259,4 @@ class PayrollBatchLine(models.Model):
                 name = 'unique_payroll_batch_line',
             )
         ]
+        ordering = ['date', 'created_at']

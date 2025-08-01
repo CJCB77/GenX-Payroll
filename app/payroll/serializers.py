@@ -140,8 +140,9 @@ class PayrollBatchLineWriteSerializer(serializers.ModelSerializer):
     
     def validate(self, attrs):
         attrs = super().validate(attrs)
-        # Check how many configs are available
-        config = PayrollConfiguration.objects.all().first()
+        if self.instance:
+            return attrs
+
         # Check daily limit 
         daily_limit = PayrollConfiguration.objects.get_config().daily_payroll_line_worker_limit
         if daily_limit and daily_limit > 0:
@@ -149,10 +150,6 @@ class PayrollBatchLineWriteSerializer(serializers.ModelSerializer):
                 field_worker=attrs['field_worker'],
                 date=attrs['date']
             )
-
-            # If updating an existing line, exclude itself
-            if self.instance:
-                qs = qs.exclude(pk=self.instance.pk)
             
             if qs.count() >= daily_limit:
                 raise serializers.ValidationError({

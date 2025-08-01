@@ -643,17 +643,225 @@ class PayrollBatchLineAPITests(AuthenticatedAPITestCase):
         self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertIn("Daily limit", str(res.data['daily_limit']))
     
-    def test_daily_limit_allows_different_days(self):
+    def test_line_update_recalculates_values(self):
         """
-        Test that the daily payroll line limit is applied per day and worker
+        Test that after modifying a line, the line is recalculated
         """
-        self.payroll_config.daily_payroll_line_worker_limit = 1
+        url = self._get_payroll_lines_urL_by_batch(self.payroll_batch.pk)
+
+        # Createa line 
         payload = {
             "field_worker": self.fw1.pk,
-            "date": date(2025, 7, 3),
+            "date": date(2025, 7, 2),
+            "activity": self.work_activity1.pk,
+            "quantity": 10,
+        }
+        res = self.client.post(url, payload, format='json')
+        self.assertEqual(res.status_code, status.HTTP_201_CREATED)
+        line_id = res.data["id"]
+        line_detail_url = self._get_payroll_line_detail_url_by_batch(self.payroll_batch.pk, line_id)
+
+        # Update line with new values
+        payload = {
+            'quantity': 20,
+        }
+        res = self.client.patch(line_detail_url, payload, format='json')
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+
+        # Check that line was recaculated
+        self.assertEqual(Decimal(res.data["quantity"]), Decimal('20.000'))
+        self.assertEqual(Decimal(res.data["total_cost"]), Decimal('40.00'))
+        self.assertEqual(Decimal(res.data["salary_surplus"]), Decimal('20.00'))
+        self.assertEqual(Decimal(res.data["mobilization_bonus"]), Decimal('16.00'))
+        self.assertEqual(Decimal(res.data["extra_hours_value"]), Decimal('4.00'))
+        self.assertEqual(Decimal(res.data["thirteenth_bonus"]), Decimal('1.6666667').quantize(Decimal('0.001')))
+        self.assertEqual(Decimal(res.data["fourteenth_bonus"]), Decimal('1.333333').quantize(Decimal('0.001')))
+        self.assertEqual(Decimal(res.data["integral_bonus"]), Decimal('0.00'))
+    
+    def test_line_update_recalculates_same_day_distribution(self):
+        """
+        When updating a line if there are other lines on the same day, they should be recalculated
+        to distribute the amount proportionally
+        """
+        url = self._get_payroll_lines_urL_by_batch(self.payroll_batch.pk)
+
+        # Createa a line
+        payload = {
+            "field_worker": self.fw1.pk,
+            "date": date(2025, 7, 2),
+            "activity": self.work_activity1.pk,
+            "quantity": 10,
+        }
+        self.client.post(url, payload, format='json')
+
+        # Create a new line on same day, different activity
+        payload = {
+            "field_worker": self.fw1.pk,
+            "date": date(2025, 7, 2),
+            "activity": self.work_activity2.pk,
+            "quantity": 1,
+        }
+        res = self.client.post(url, payload, format='json')
+        line_id = res.data["id"]
+
+        # Update line with new values
+        payload = {
+            'quantity': 5,
+        }
+        line_detail_url = self._get_payroll_line_detail_url_by_batch(self.payroll_batch.pk, line_id)
+        res = self.client.patch(line_detail_url, payload, format='json')
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+
+        # Check that each line for the same day was recaculated
+        same_day_lines = PayrollBatchLine.objects.filter(date=date(2025, 7, 2))
+        self.assertEqual(same_day_lines[0].salary_surplus, Decimal('8.571'))
+        self.assertEqual(same_day_lines[1].salary_surplus, Decimal('6.429'))
+        self.assertEqual(same_day_lines[0].mobilization_bonus, Decimal('6.857'))
+        self.assertEqual(same_day_lines[1].mobilization_bonus, Decimal('5.143'))
+        self.assertEqual(same_day_lines[0].extra_hours_value, Decimal('1.714'))
+        self.assertEqual(same_day_lines[1].extra_hours_value, Decimal('1.286'))
+    
+    def test_line_update_recalculates_week_integral(self):
+        """
+        When a line is updated, the integral bonus should be recalculated
+        """
+        # Create four lines for a worker in a week
+        PayrollBatchLine.objects.create(
+            field_worker=self.fw1, 
+            activity=self.work_activity1, 
+            quantity=10, date=date(2025, 7, 2), 
+            payroll_batch=self.payroll_batch
+        )
+        PayrollBatchLine.objects.create(
+            field_worker=self.fw1, 
+            activity=self.work_activity1, 
+            quantity=10, date=date(2025, 7, 3), 
+            payroll_batch=self.payroll_batch
+        )
+        # Add another line through the API to trigger recalculations
+        url = self._get_payroll_lines_urL_by_batch(self.payroll_batch.pk)
+        payload = {
+            "field_worker": self.fw1.pk,
+            "date": date(2025, 7, 4),
+            "activity": self.work_activity1.pk,
+            "quantity": 10,
+        }
+        res = self.client.post(url, payload, format='json')
+        line_id = res.data["id"]
+        self.assertEqual(res.status_code, status.HTTP_201_CREATED)
+
+        # Check that all lines we updated with correct integral
+        fw_lines = PayrollBatchLine.objects.filter(field_worker=self.fw1)
+        for line in fw_lines:
+            self.assertEqual(line.integral_bonus, Decimal('8.00'))
+        
+        # Update a line activity for something that does not cound as worked day
+        url = self._get_payroll_line_detail_url_by_batch(self.payroll_batch.pk, line_id)
+        payload = {
+            "activity": self.leave_activity.pk,
+        }
+        res = self.client.patch(url, payload, format='json')
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        self.assertEqual(Decimal(res.data["integral_bonus"]), Decimal('0.000'))
+
+        # Check that all lines we updated with correct integral
+        fw_lines = PayrollBatchLine.objects.filter(
+            field_worker=self.fw1,
+            integral_bonus__gt=0
+        )
+        for line in fw_lines:
+            self.assertEqual(line.integral_bonus, Decimal('5.00'))
+    
+    def test_deleting_a_line(self):
+        # Create a line for fw2
+        payload = {
+            "field_worker": self.fw2.pk,
+            "date": date(2025, 7, 5),
+            "activity": self.work_activity1.pk,
+            "quantity": 10,
+        
+        }
+        res = self.client.post(self._get_payroll_lines_urL_by_batch(self.payroll_batch.pk), payload, format='json')
+        self.assertEqual(PayrollBatchLine.objects.filter(field_worker=self.fw2).count(), 1)
+
+        line_id = res.data["id"]
+        url = self._get_payroll_line_detail_url_by_batch(self.payroll_batch.pk, line_id)
+        logger.info(f"Deleting line with id {line_id} wiht url {url}")
+        res = self.client.delete(url)
+
+        self.assertEqual(res.status_code, status.HTTP_204_NO_CONTENT)
+        self.assertEqual(PayrollBatchLine.objects.filter(field_worker=self.fw2).count(), 0)
+
+    def test_deleting_line_recalculates_week_integral(self):
+        """
+        When a line is deleted, the integral bonus should be recalculated
+        """
+        # Create four lines for a worker in a week
+        PayrollBatchLine.objects.create(
+            field_worker=self.fw1, 
+            activity=self.work_activity1, 
+            quantity=10, date=date(2025, 7, 2), 
+            payroll_batch=self.payroll_batch
+        )
+        PayrollBatchLine.objects.create(
+            field_worker=self.fw1, 
+            activity=self.work_activity1, 
+            quantity=10, date=date(2025, 7, 3), 
+            payroll_batch=self.payroll_batch
+        )
+        # Add another line through the API to trigger recalculations
+        url = self._get_payroll_lines_urL_by_batch(self.payroll_batch.pk)
+        payload = {
+            "field_worker": self.fw1.pk,
+            "date": date(2025, 7, 4),
+            "activity": self.work_activity1.pk,
+            "quantity": 10,
+        }
+
+        res = self.client.post(url, payload, format='json')
+        line_id = res.data["id"]
+        
+        # Delete a line
+        url = self._get_payroll_line_detail_url_by_batch(self.payroll_batch.pk, line_id)
+        res = self.client.delete(url)
+
+        # Check that all lines we updated with correct integral
+        fw_lines = PayrollBatchLine.objects.filter(field_worker=self.fw1)
+        for line in fw_lines:
+            self.assertEqual(line.integral_bonus, Decimal('5.00'))
+        
+    def test_deleting_line_recalculates_same_day_distribution(self):
+        """
+        When a line is deleted, if there were other lines on the same day, 
+        the weekly bonuses should be recalculated
+        """
+        payload = {
+            "field_worker": self.fw1.pk,
+            "date": date(2025, 7, 15),
             "activity": self.work_activity1.pk,
             "quantity": 10,
         }
         url = self._get_payroll_lines_urL_by_batch(self.payroll_batch.pk)
+        res = self.client.post(url , payload, format='json')
+
+        # Create another line for the same day
+        payload = {
+            "field_worker": self.fw1.pk,
+            "date": date(2025, 7, 15),
+            "activity": self.work_activity2.pk,
+            "quantity": 10,
+        }
         res = self.client.post(url, payload, format='json')
-        self.assertEqual(res.status_code, status.HTTP_201_CREATED)
+
+        line_id = res.data["id"]
+
+        # Delete a line
+        url = self._get_payroll_line_detail_url_by_batch(self.payroll_batch.pk, line_id)
+        res = self.client.delete(url)
+
+        # Check that all lines we updated with correct integral
+        fw_lines = PayrollBatchLine.objects.filter(field_worker=self.fw1, date=date(2025, 7, 15))
+        self.assertEqual(fw_lines[0].salary_surplus, Decimal('0.00'))
+        self.assertEqual(fw_lines[0].mobilization_bonus, Decimal('0.00'))
+        self.assertEqual(fw_lines[0].extra_hours_value, Decimal('0.00'))
+    

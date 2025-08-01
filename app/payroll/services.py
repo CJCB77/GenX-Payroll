@@ -85,23 +85,31 @@ def calculate_integral_bonus(worker_wage, worked_days):
     return integral_bonus
 
 def compute_weekly_integral_for_worker(worker, payroll_batch):
+    # Clear all integral bonuses for this worker in this week
+    PayrollBatchLine.objects.filter(
+        field_worker=worker,
+        payroll_batch=payroll_batch,
+    ).update(integral_bonus=0)
+
     # Get all the lines of this worker in this week for the payroll batch
-    fw_lines = PayrollBatchLine.objects.filter(
+    fw_work_lines = PayrollBatchLine.objects.filter(
         field_worker=worker, 
-        payroll_batch=payroll_batch, 
+        payroll_batch=payroll_batch,
+        activity__labor_type__calculates_integral=True 
     )
+
     # Get distinc count of worked days
-    worked_days = fw_lines.values_list('date', flat=True).distinct().count()
+    worked_days = fw_work_lines.values_list('date', flat=True).distinct().count()
     integral_bonus = calculate_integral_bonus(worker.wage, worked_days)
     if integral_bonus == 0:
         return
     
     distributed_integral_bonus = integral_bonus / worked_days
-    for line in fw_lines:
+    for line in fw_work_lines:
             line.integral_bonus = Decimal(distributed_integral_bonus)
             line.save()
             
-def distribute_proportionally_same_day_for_worker(worker, payroll_batch, date):
+def recalc_same_day_for_worker(worker, payroll_batch, date):
     """
     If a worker has more than one line for the same day, distribute calculations proportionally
     """
@@ -112,6 +120,9 @@ def distribute_proportionally_same_day_for_worker(worker, payroll_batch, date):
         date=date,
         field_worker=worker
     )
+    if not fw_lines.exists():
+        return
+    
     lines_total_cost = fw_lines.aggregate(total_cost=Sum('total_cost'))['total_cost']
     total_salary_surplus = lines_total_cost - fw_daily_wage
     for line in fw_lines:
