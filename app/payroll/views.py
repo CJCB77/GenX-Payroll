@@ -30,7 +30,8 @@ from .serializers import (
     PayrollConfigurationSerializer,
     TariffSerializer,
     PayrollBatchLineSerializer,
-    PayrollBatchLineWriteSerializer
+    PayrollBatchLineWriteSerializer,
+    LaborTypeSerializer
 )
 from .filters import (
     FieldWorkerFilter,
@@ -139,7 +140,7 @@ class UomViewSet(viewsets.ModelViewSet):
 
 class LaborTypeViewSet(viewsets.ModelViewSet):
     queryset = LaborType.objects.all()
-    serializer_class = ActivitySerializer
+    serializer_class = LaborTypeSerializer
     filterset_fields = ['calculates_integral', 'calculates_thirteenth_bonus', 'calculates_fourteenth_bonus']
     search_fields = ['name']
 

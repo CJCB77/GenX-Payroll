@@ -445,16 +445,13 @@ class PayrollBatchLineAPITests(AuthenticatedAPITestCase):
             "activity": self.work_activity1.pk,
             "quantity": 10,
         }
-        # Calculate the daily thirteenth bonus and compared it
-        fw_wage = self.fw2.wage or 0
-        daily_thirteenth_bonus = (fw_wage / MONTHS_IN_YEAR) / DAYS_OF_THE_MONTH 
-
+        
         res = self.client.post(url, payload, format="json")
         self.assertEqual(res.status_code, status.HTTP_201_CREATED)
 
         self.assertEqual(
             Decimal(res.data["thirteenth_bonus"]), 
-            Decimal(daily_thirteenth_bonus).quantize(Decimal('0.001'))
+            Decimal('2.133')
         )
     
     def test_fourteenth_bonus_is_calculated_on_creation(self):
@@ -591,11 +588,11 @@ class PayrollBatchLineAPITests(AuthenticatedAPITestCase):
         # Thirteenth bonus distribution
         self.assertEqual(
             Decimal(res.data["results"][0]["thirteenth_bonus"]), 
-            Decimal('1.0416').quantize(Decimal('0.001'))
+            Decimal('2.5416').quantize(Decimal('0.001'))
         )
         self.assertEqual(
             Decimal(res.data["results"][1]["thirteenth_bonus"]), 
-            Decimal('0.625').quantize(Decimal('0.001'))
+            Decimal('1.525').quantize(Decimal('0.001'))
         )
 
         # Fourteenth bonus distribution
@@ -674,7 +671,7 @@ class PayrollBatchLineAPITests(AuthenticatedAPITestCase):
         self.assertEqual(Decimal(res.data["salary_surplus"]), Decimal('20.00'))
         self.assertEqual(Decimal(res.data["mobilization_bonus"]), Decimal('16.00'))
         self.assertEqual(Decimal(res.data["extra_hours_value"]), Decimal('4.00'))
-        self.assertEqual(Decimal(res.data["thirteenth_bonus"]), Decimal('1.6666667').quantize(Decimal('0.001')))
+        self.assertEqual(Decimal(res.data["thirteenth_bonus"]), Decimal('5.6666667').quantize(Decimal('0.001')))
         self.assertEqual(Decimal(res.data["fourteenth_bonus"]), Decimal('1.333333').quantize(Decimal('0.001')))
         self.assertEqual(Decimal(res.data["integral_bonus"]), Decimal('0.00'))
     
@@ -865,3 +862,26 @@ class PayrollBatchLineAPITests(AuthenticatedAPITestCase):
         self.assertEqual(fw_lines[0].mobilization_bonus, Decimal('0.00'))
         self.assertEqual(fw_lines[0].extra_hours_value, Decimal('0.00'))
     
+    def test_weekends_go_all_to_mobilization_extra_hours(self):
+        """
+        If a records is created on a weekend, everythign gaines by the workers
+        should be distirbuted into mobilization and extra hours
+        """
+        # Create a record on a weekend
+        payload = {
+            "field_worker": self.fw1.pk,
+            "date": date(2025, 8, 9),
+            "activity": self.work_activity1.pk,
+            "quantity": 10, #20
+        }
+        url = self._get_payroll_lines_urL_by_batch(self.payroll_batch.pk)
+        res = self.client.post(url , payload, format='json')
+
+        # Check that all lines we updated with correct integral
+        fw_lines = PayrollBatchLine.objects.filter(field_worker=self.fw1, date=date(2025, 8, 9))
+        self.assertEqual(fw_lines[0].total_cost, Decimal('20.000'))
+        self.assertEqual(fw_lines[0].salary_surplus, Decimal('20.000'))
+        self.assertEqual(fw_lines[0].mobilization_bonus, Decimal('16.000'))
+        self.assertEqual(fw_lines[0].extra_hours_value, Decimal('4.000'))
+        self.assertEqual(fw_lines[0].thirteenth_bonus, Decimal('4.000'))
+        self.assertEqual(fw_lines[0].fourteenth_bonus, Decimal('1.333'))

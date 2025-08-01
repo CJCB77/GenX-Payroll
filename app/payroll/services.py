@@ -34,11 +34,10 @@ def calculate_extra_hours(surplus,worker):
         
     return extra_hours_value, extra_hours_qty
 
-def calculate_thirteenth_bonus(worker):
-    fw_wage = worker.wage 
-
-    daily_thirteenth_bonus = (fw_wage / MONTHS_IN_YEAR) / DAYS_OF_THE_MONTH
-    return daily_thirteenth_bonus
+def calculate_thirteenth_bonus(daily_wage, extra_hours, only_extra_hours=False):
+    daily_thirteenth_bonus = daily_wage / MONTHS_IN_YEAR
+    total_thirteenth_bonus = extra_hours + (daily_thirteenth_bonus if not only_extra_hours else 0) 
+    return total_thirteenth_bonus
 
 def calculate_fourteenth_bonus(worker):
     config = PayrollConfiguration.get_config()
@@ -50,18 +49,24 @@ def calculate_fourteenth_bonus(worker):
 
 def compute_inline_calculations(line: PayrollBatchLine):
     worker = line.field_worker
-    daily_wage = worker.wage / Decimal(30)
+    daily_wage = (worker.wage or 0) / Decimal(DAYS_OF_THE_MONTH)
     try:
         tariff = Tariff.objects.get(activity= line.activity, farm = line.payroll_batch.farm)
         tariff_price = tariff.cost_per_unit
     except Tariff.DoesNotExist:
         tariff_price = 0
+    
+    line_is_weekend = line.date.weekday() >= 5
+
     total_cost = line.quantity * tariff_price
-    surplus = max(Decimal(0), total_cost - daily_wage)
+    if line_is_weekend:
+        surplus = total_cost
+    else:
+        surplus = max(Decimal(0), total_cost - daily_wage)
 
     mobilization = calculate_mobilization(surplus)
     extra_hours, extra_hours_qty = calculate_extra_hours(surplus, worker)
-    thirteenth_bonus = calculate_thirteenth_bonus(worker)
+    thirteenth_bonus = calculate_thirteenth_bonus(daily_wage, extra_hours, only_extra_hours=line_is_weekend)
     fourthteenth_bonus = calculate_fourteenth_bonus(worker)
 
     return {
@@ -113,6 +118,7 @@ def recalc_same_day_for_worker(worker, payroll_batch, date):
     """
     If a worker has more than one line for the same day, distribute calculations proportionally
     """
+    line_is_weekend = date.weekday() >= 5
     fw_daily_wage = worker.wage / DAYS_OF_THE_MONTH
     # Get all lines for this worker's day
     fw_lines = PayrollBatchLine.objects.filter(
@@ -124,13 +130,17 @@ def recalc_same_day_for_worker(worker, payroll_batch, date):
         return
     
     lines_total_cost = fw_lines.aggregate(total_cost=Sum('total_cost'))['total_cost']
-    total_salary_surplus = lines_total_cost - fw_daily_wage
+    total_salary_surplus = (lines_total_cost - fw_daily_wage) if not line_is_weekend else lines_total_cost
     for line in fw_lines:
         proportion = line.total_cost / lines_total_cost
         line.salary_surplus = total_salary_surplus * proportion
         line.mobilization_bonus = calculate_mobilization(line.salary_surplus)
         line.extra_hours_value, line.extra_hours_qty = calculate_extra_hours(line.salary_surplus, worker)
-        line.thirteenth_bonus = calculate_thirteenth_bonus(worker) * proportion
+        line.thirteenth_bonus = calculate_thirteenth_bonus(
+            daily_wage=fw_daily_wage * proportion, 
+            extra_hours=line.extra_hours_value, 
+            only_extra_hours=line_is_weekend
+        )
         line.fourteenth_bonus = calculate_fourteenth_bonus(worker) * proportion
         line.integral_bonus = line.integral_bonus * proportion
         line.save()
