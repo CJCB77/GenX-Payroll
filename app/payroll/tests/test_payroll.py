@@ -396,7 +396,7 @@ class PayrollBatchLineAPITests(AuthenticatedAPITestCase):
             "field_worker": self.fw2.pk,
             "date": date(2025, 7, 1),
             "activity": self.work_activity1.pk,
-            "quantity": 10,
+            "quantity": 10, # 20
         }
         res = self.client.post(url, payload, format="json")
         self.assertEqual(res.status_code, status.HTTP_201_CREATED)
@@ -443,7 +443,7 @@ class PayrollBatchLineAPITests(AuthenticatedAPITestCase):
             "field_worker": self.fw2.pk,
             "date": date(2025, 7, 1),
             "activity": self.work_activity1.pk,
-            "quantity": 10,
+            "quantity": 10, # 20
         }
         
         res = self.client.post(url, payload, format="json")
@@ -548,7 +548,7 @@ class PayrollBatchLineAPITests(AuthenticatedAPITestCase):
             "field_worker": self.fw1.pk,
             "date": date(2025, 7, 2),
             "activity": self.work_activity1.pk,
-            "quantity": 10,
+            "quantity": 10, # 20
         }
         url = self._get_payroll_lines_urL_by_batch(self.payroll_batch.pk)
         res = self.client.post(url, payload, format='json')
@@ -559,7 +559,7 @@ class PayrollBatchLineAPITests(AuthenticatedAPITestCase):
             "field_worker": self.fw1.pk,
             "date": date(2025, 7, 2),
             "activity": self.work_activity2.pk,
-            "quantity": 4,
+            "quantity": 4, #12
         }
         res = self.client.post(url, payload, format='json')
         self.assertEqual(res.status_code, status.HTTP_201_CREATED)

@@ -4,12 +4,6 @@ from celery import shared_task
 from logging import getLogger
 from .models import FieldWorker
 from datetime import datetime
-from .services import (
-    compute_inline_calculations,
-    compute_weekly_integral_for_worker,
-    recalc_same_day_for_worker
-)
-
 from payroll.models import (
     PayrollBatchLine
 )
@@ -134,35 +128,24 @@ def sync_contract(self, payload):
     except Exception as e:
         logger.error(f"Error syncing employee: {e}")
         raise self.retry(exc=e)
+
+class PayrollService:
+    """
+    Services layer that coordinates payroll operations
+    Follows Dependency Inversion principle
+    """
+
+    def __init__(self, orchestrator):
+        self.orchestrator = orchestrator
+
+    def handle_line_creation(self, line_id):
+        """Handle calculation after line creation"""
+        self.orchestrator.recalculate_line(line_id, recalc_week=True)
     
-def recalc_week_for_worker(worker, payroll_batch):
-    """
-    Called on create or update of a payroll line: recomputes week bonuses
-    """
-    compute_weekly_integral_for_worker(worker, payroll_batch)
-
-def recalc_single_line(line_id, recalc_week=True):
-    """
-    Called on create or update of a line: recomputes costs, bonuses, etc
-    """
-    line = PayrollBatchLine.objects.get(id=line_id)
-    # Get inline totals
-    calculations = compute_inline_calculations(line)
-    for field, value in calculations.items():
-        setattr(line, field, value)
-    line.save()
+    def handle_line_update(self, line_id, activity_changed=False):
+        """Handle calculation after line update"""
+        self.orchestrator.recalculate_line(line_id, recalc_week=activity_changed)
     
-    # Check if day-level recalc is needed
-    same_day_lines_count = PayrollBatchLine.objects.filter(
-        payroll_batch=line.payroll_batch,
-        field_worker=line.field_worker,
-        date=line.date
-    ).count()
-
-    if same_day_lines_count > 1:
-        recalc_same_day_for_worker(line.field_worker,line.payroll_batch,line.date)
-
-    # Week-level recalculation
-    if recalc_week:
-        recalc_week_for_worker(line.field_worker,line.payroll_batch)
-
+    def handle_line_deletion(self, worker, payroll_batch, date):
+        """Handle calculation after line deletion"""
+        self.orchestrator.recalculate_after_deletion(worker, payroll_batch, date)

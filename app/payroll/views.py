@@ -37,10 +37,11 @@ from .filters import (
     FieldWorkerFilter,
     PayrollLineFilter
 )
+from .calculators import (
+    PayrollCalculationOrchestrator
+)
 from .tasks import (
-    recalc_single_line,
-    recalc_same_day_for_worker,
-    recalc_week_for_worker,
+    PayrollService
 )
 from logging import getLogger
 
@@ -188,6 +189,10 @@ class PayrollBatchLineViewSet(viewsets.ModelViewSet):
     filterset_class = PayrollLineFilter
     serializer_class = PayrollBatchLineSerializer
 
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.payroll_service = PayrollService(orchestrator=PayrollCalculationOrchestrator())
+
     def get_queryset(self):
         # If nested under a batch, filter by that batch
         batch_pk = self.kwargs.get("batch_pk")
@@ -203,10 +208,11 @@ class PayrollBatchLineViewSet(viewsets.ModelViewSet):
     def perform_create(self, serializer):
         # Set the batch from the param
         batch_pk = self.kwargs.get("batch_pk")
-        batch = get_object_or_404(PayrollBatch, pk=batch_pk) 
+        batch = get_object_or_404(PayrollBatch, pk=batch_pk)
+
         serializer.save(payroll_batch=batch)
         # When a line is created, calculate outputs
-        recalc_single_line(serializer.instance.id)
+        self.payroll_service.handle_line_creation(serializer.instance.id)
         serializer.instance.refresh_from_db()
     
     def perform_update(self, serializer):
@@ -216,13 +222,13 @@ class PayrollBatchLineViewSet(viewsets.ModelViewSet):
         line = serializer.save()
         activity_changed = original_activity != line.activity
         # When a line is updated, recalculate
-        recalc_single_line(line.id, recalc_week=activity_changed)
+        self.payroll_service.handle_line_update(line.id, activity_changed)
         serializer.instance.refresh_from_db()
     
     def perform_destroy(self, instance):
         # Get the week the line that was deleted
-        line = instance
-        logger.info(f"Deleting line {line.id}")
+        worker = instance.field_worker
+        payroll_batch = instance.payroll_batch
+        date = instance.date
         super().perform_destroy(instance)
-        recalc_same_day_for_worker(line.field_worker,line.payroll_batch,line.date)
-        recalc_week_for_worker(line.field_worker,line.payroll_batch)
+        self.payroll_service.handle_line_deletion(worker, payroll_batch, date)
