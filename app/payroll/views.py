@@ -7,7 +7,8 @@ from rest_framework.permissions import AllowAny
 from payroll.tasks import (
     sync_employee, 
     sync_contract,
-    recalc_line_task
+    recalc_line_task,
+    recalc_delete_task
 )
 from django.utils.decorators import method_decorator
 from django.views.decorators.cache import cache_page
@@ -234,8 +235,14 @@ class PayrollBatchLineViewSet(viewsets.ModelViewSet):
     
     def perform_destroy(self, instance):
         # Get the week the line that was deleted
-        worker = instance.field_worker
-        payroll_batch = instance.payroll_batch
-        date = instance.date
+        worker_id = instance.field_worker.id
+        payroll_batch_id = instance.payroll_batch.id
+        date = instance.date.isoformat()
+
         super().perform_destroy(instance)
-        self.payroll_service.handle_line_deletion(worker, payroll_batch, date)
+        
+        batch = PayrollBatch.objects.get(pk=payroll_batch_id)
+        batch.status = 'processing'
+        batch.save(update_fields=['status'])
+
+        recalc_delete_task.delay(worker_id, payroll_batch_id, date)

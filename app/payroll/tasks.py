@@ -149,7 +149,7 @@ def recalc_line_task(self, line_id, recalc_week=True):
 @shared_task(bind=True, max_retries=3, default_retry_delay=30)
 def recalc_delete_task(self, worker_id, batch_id, date_iso):
     """
-    Recalculate day+week after a deletion.
+    Recalculate day + week after a deletion.
     Then mark the batch 'ready'.
     """
     from datetime import date
