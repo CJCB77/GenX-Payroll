@@ -4,7 +4,12 @@ from .models import (
     FieldWorker,
     PayrollConfiguration,
     PayrollBatchLine,
-    PayrollBatch
+    PayrollBatch,
+    Activity,
+    ActivityGroup,
+    Farm,
+    LaborType,
+    Uom,
 )
 
 class FieldWorkerAdmin(admin.ModelAdmin):
@@ -56,8 +61,29 @@ class PayrollBatchLineAdmin(admin.ModelAdmin):
     list_filter = ('date', 'field_worker')
     search_fields = ['field_worker__name', 'field_worker__identification_number']
 
+class FarmAdmin(admin.ModelAdmin):
+    list_display = ('name', 'code', 'description')
+
+class ActivityGroupAdmin(admin.ModelAdmin):
+    list_display = ('id', 'name', 'code')
+
+class ActivityAdmin(admin.ModelAdmin):
+    list_display = ('id', 'name', 'activity_group', 'labor_type', 'uom')
+
+class LaborTypeAdmin(admin.ModelAdmin):
+    list_display = ('name', 'code', 'calculates_integral', 'calculates_thirteenth_bonus', 'calculates_fourteenth_bonus')
+    
+class UomAdmin(admin.ModelAdmin):
+    list_display = ('name',)
+
 admin.site.register(PayrollBatchLine, PayrollBatchLineAdmin)
 admin.site.register(PayrollBatch)
+
+admin.site.register(Farm, FarmAdmin)
+admin.site.register(ActivityGroup, ActivityGroupAdmin)
+admin.site.register(Activity, ActivityAdmin)
+admin.site.register(LaborType, LaborTypeAdmin)
+admin.site.register(Uom, UomAdmin)
 
 admin.site.register(FieldWorker, FieldWorkerAdmin)
 admin.site.register(PayrollConfiguration, PayrollConfigurationAdmin)
