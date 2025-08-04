@@ -1,9 +1,14 @@
 from django.shortcuts import get_object_or_404
+from rest_framework.decorators import action
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status, viewsets, generics
 from rest_framework.permissions import AllowAny
-from .tasks import sync_employee, sync_contract
+from payroll.tasks import (
+    sync_employee, 
+    sync_contract,
+    recalc_line_task
+)
 from django.utils.decorators import method_decorator
 from django.views.decorators.cache import cache_page
 from .models import (
@@ -37,12 +42,7 @@ from .filters import (
     FieldWorkerFilter,
     PayrollLineFilter
 )
-from .orchestrators import (
-    PayrollCalculationOrchestrator
-)
-from .services.payroll_services import (
-    PayrollService
-)
+
 from logging import getLogger
 
 logger = getLogger(__name__)
@@ -157,6 +157,11 @@ class PayrollBatchViewSet(viewsets.ModelViewSet):
     filterset_fields = ['status']
     search_fields = ['name']
 
+    @action(detail=True, methods=['get'])
+    def status(self, request, pk=None):
+        batch = self.get_object()
+        return Response({"status": batch.status})
+
 class PayrollConfigurationView(generics.RetrieveUpdateAPIView):
     """
     GET  /api/v1/configuration/ → returns the singleton config
@@ -189,10 +194,6 @@ class PayrollBatchLineViewSet(viewsets.ModelViewSet):
     filterset_class = PayrollLineFilter
     serializer_class = PayrollBatchLineSerializer
 
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.payroll_service = PayrollService(orchestrator=PayrollCalculationOrchestrator())
-
     def get_queryset(self):
         # If nested under a batch, filter by that batch
         batch_pk = self.kwargs.get("batch_pk")
@@ -210,20 +211,26 @@ class PayrollBatchLineViewSet(viewsets.ModelViewSet):
         batch_pk = self.kwargs.get("batch_pk")
         batch = get_object_or_404(PayrollBatch, pk=batch_pk)
 
-        serializer.save(payroll_batch=batch)
-        # When a line is created, calculate outputs
-        self.payroll_service.handle_line_creation(serializer.instance.id)
-        serializer.instance.refresh_from_db()
+        batch.status = 'processing'
+        batch.save(update_fields=['status'])
+
+        # Create the line
+        line = serializer.save(payroll_batch=batch)
+        
+        recalc_line_task.delay(line.id, recalc_week=True)
     
     def perform_update(self, serializer):
         # Original activity may have changed
         original_activity = serializer.instance.activity
-
         line = serializer.save()
         activity_changed = original_activity != line.activity
-        # When a line is updated, recalculate
-        self.payroll_service.handle_line_update(line.id, activity_changed)
-        serializer.instance.refresh_from_db()
+
+        batch = line.payroll_batch
+        batch.status = 'processing'
+        batch.save(update_fields=['status'])
+
+        # Recalculate the line
+        recalc_line_task.delay(line.id, recalc_week=activity_changed)
     
     def perform_destroy(self, instance):
         # Get the week the line that was deleted

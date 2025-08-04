@@ -2,7 +2,9 @@ from django.contrib import admin
 
 from .models import (
     FieldWorker,
-    PayrollConfiguration
+    PayrollConfiguration,
+    PayrollBatchLine,
+    PayrollBatch
 )
 
 class FieldWorkerAdmin(admin.ModelAdmin):
@@ -36,6 +38,26 @@ class PayrollConfigurationAdmin(admin.ModelAdmin):
             "daily_payroll_line_worker_limit",
         ]}),
     )
+
+class PayrollBatchLineAdmin(admin.ModelAdmin):
+    list_display = (
+        'field_worker', 
+        'date',
+        'activity',
+        'quantity',
+        'total_cost',
+        'salary_surplus',
+        'extra_hours_value', 
+        'mobilization_bonus',
+        'thirteenth_bonus', 
+        'fourteenth_bonus',
+        'integral_bonus'
+    )
+    list_filter = ('date', 'field_worker')
+    search_fields = ['field_worker__name', 'field_worker__identification_number']
+
+admin.site.register(PayrollBatchLine, PayrollBatchLineAdmin)
+admin.site.register(PayrollBatch)
 
 admin.site.register(FieldWorker, FieldWorkerAdmin)
 admin.site.register(PayrollConfiguration, PayrollConfigurationAdmin)

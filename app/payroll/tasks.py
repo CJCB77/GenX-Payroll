@@ -4,8 +4,10 @@ from celery import shared_task
 from logging import getLogger
 from .models import FieldWorker
 from datetime import datetime
+from .orchestrators import PayrollCalculationOrchestrator
 from payroll.models import (
-    PayrollBatchLine
+    PayrollBatchLine,
+    PayrollBatch
 )
 
 logger = getLogger(__name__)
@@ -129,3 +131,36 @@ def sync_contract(self, payload):
         logger.error(f"Error syncing employee: {e}")
         raise self.retry(exc=e)
 
+@shared_task(bind=True, max_retries=3)
+def recalc_line_task(self, line_id, recalc_week=True):
+    """
+    Recalculate one line (and optionally its week).
+    When done, mark the batch 'ready'.
+    """
+    orchestrator = PayrollCalculationOrchestrator()
+    orchestrator.recalculate_line(line_id, recalc_week=recalc_week)
+
+    # finally mark batch ready
+    batch_id = PayrollBatchLine.objects.get(pk=line_id).payroll_batch_id
+    PayrollBatch.objects.filter(pk=batch_id).update(
+        status='ready',
+    )
+
+@shared_task(bind=True, max_retries=3, default_retry_delay=30)
+def recalc_delete_task(self, worker_id, batch_id, date_iso):
+    """
+    Recalculate day+week after a deletion.
+    Then mark the batch 'ready'.
+    """
+    from datetime import date
+    y, m, d = map(int, date_iso.split('-'))
+    dt = date(y, m, d)
+
+    worker = FieldWorker.objects.get(pk=worker_id)
+    batch  = PayrollBatch.objects.get(pk=batch_id)
+
+    orchestrator = PayrollCalculationOrchestrator()
+    orchestrator.recalculate_after_deletion(worker, batch, dt)
+
+    batch.status = 'ready'
+    batch.save(update_fields=['status'])

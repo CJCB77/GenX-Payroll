@@ -175,7 +175,8 @@ class PayrollBatch(models.Model):
     """Represent a batch of payroll data uploaded weekly by a user"""    
     STATUS_CHOICES = [
         ('draft', 'Draft'),
-        ('submitted', 'Submitted'),
+        ('processing', 'Processing'),
+        ('ready', 'Ready'),
         ('approved', 'Approved'),
         ('rejected', 'Rejected'),
     ]
