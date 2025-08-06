@@ -98,6 +98,33 @@ class InlineCalculator(BasePayrollCalculator):
 
         line.save()
     
+    def calculate_batch(self, lines):
+        updated_lines = []
+
+        for line in lines:
+            worker = line.field_worker
+            daily_wage = self._get_daily_wage(worker)
+            tariff_price = self._get_tariff_price(line)
+            is_weekend = self._is_weekend(line)
+
+            line.total_cost = line.quantity * tariff_price
+            line.salary_surplus = self._get_surplus(line.total_cost, daily_wage, is_weekend)
+            line.mobilization_bonus = self._calculate_mobilization(line.salary_surplus)
+            line.extra_hours_value = self._calculate_extra_hours(line.salary_surplus)
+            line.extra_hours_qty = self._calculate_extra_hours_qty(line.extra_hours_value, worker)
+            line.thirteenth_bonus = self._calculate_thirteenth_bonus(daily_wage, line.extra_hours_value, is_weekend)
+            line.fourteenth_bonus = self._calculate_fourteenth_bonus(worker)
+
+            updated_lines.append(line)
+
+        PayrollBatchLine.objects.bulk_update(
+            updated_lines, 
+            ['total_cost', 'salary_surplus', 'mobilization_bonus', 'extra_hours_value', 
+             'extra_hours_qty', 'thirteenth_bonus', 'fourteenth_bonus']
+        )
+
+        return updated_lines
+        
 class DayLevelCalculator(BasePayrollCalculator):
     """Single Responsability: Calculate proportional bonuse for same-day lines"""
 

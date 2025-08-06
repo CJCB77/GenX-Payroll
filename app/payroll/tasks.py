@@ -1,13 +1,27 @@
+from collections import defaultdict
+from typing import List
 from django.utils import timezone
 from django.db import transaction
-from celery import shared_task
+from django.core.files.storage import default_storage
+from celery import shared_task, group, chain
 from logging import getLogger
-from .models import FieldWorker
 from datetime import datetime
 from .orchestrators import PayrollCalculationOrchestrator
 from payroll.models import (
     PayrollBatchLine,
-    PayrollBatch
+    PayrollBatch,
+    FieldWorker,
+)
+from payroll.payroll_processor import (
+    PayrollBatchCreator,
+    PayrollFileProcessor,
+    PayrollFileValidator,
+    ValidationError
+)
+from payroll.calculators import (
+    DayLevelCalculator,
+    InlineCalculator,
+    WeekLevelCalculator
 )
 
 logger = getLogger(__name__)
@@ -164,3 +178,144 @@ def recalc_delete_task(self, worker_id, batch_id, date_iso):
 
     batch.status = 'ready'
     batch.save(update_fields=['status'])
+
+@shared_task
+def batch_inline_calculation_task(batch_id):
+    """
+    Task that calculates inline fields for all lines in a batch
+    """
+    try:
+        lines = PayrollBatchLine.objects.filter(payroll_batch__id=batch_id)
+        calculator = InlineCalculator()
+
+        calculator.calculate_batch(lines)
+        
+        logger.info(f"Calculated inline fields for {lines.count()} lines in batch {batch_id}")
+        return batch_id
+    
+    except Exception as e:
+        logger.error(f"Error calculating inline fields for batch {batch_id}: {e}")
+        raise
+
+@shared_task
+def batch_day_level_calculation_task(batch_id):
+    """
+    Task to calculate day-level proportional bonuses
+    Groups by (worker, date) and distributes proportionally
+    """
+    try:
+        day_groups = defaultdict(list)
+        lines = PayrollBatchLine.objects.filter(payroll_batch__id=batch_id).select_related('field_worker')
+
+        for line in lines:
+            key = (line.field_worker.id, line.date)
+            day_groups[key].append(line)
+        
+        # Filter to only groups with multiple lines per day
+        multi_line_days = {k: v for k, v in day_groups.items() if len(v) > 1}
+
+        calculator = DayLevelCalculator()
+
+        for (worker_id, date), lines_for_day in multi_line_days.items():
+            worker = lines_for_day[0].field_worker
+            context = {'worker': worker, 'payroll_batch': batch_id, 'date': date}
+            calculator.calculate(context)
+
+        logger.info(f"Calculated day-level proportional bonuses for {len(multi_line_days)} days in batch {batch_id}")
+        return batch_id
+
+    except Exception as e:
+        logger.error(f"Error calculating day-level proportional bonuses for batch {batch_id}: {e}")
+        raise
+
+@shared_task
+def batch_week_level_calculation_task(batch_id):
+    """
+    Task to calculate week-level proportional bonuses
+    Groups by worker and calculates weekly
+    """
+    try:
+        payroll_batch = PayrollBatch.objects.get(pk=batch_id)
+        lines_by_worker = PayrollBatchLine.objects.filter(payroll_batch=payroll_batch)\
+            .order_by('field_worker')\
+            .distinct('field_worker')
+
+        calculator = WeekLevelCalculator()
+
+        for line in lines_by_worker:
+            context = {'worker': line.field_worker, 'payroll_batch': batch_id}
+            calculator.calculate(context)
+
+        logger.info(f"Calculated week-level proportional bonuses for {lines_by_worker.count()} workers in batch {batch_id}")
+        return batch_id
+
+    except Exception as e:
+        logger.error(f"Error calculating week-level proportional bonuses for batch {batch_id}: {e}")
+        raise
+
+
+@shared_task
+def finalize_batch_task(batch_id):
+    try:
+        PayrollBatch.objects.filter(pk=batch_id).update(status='ready', error_message=None)
+
+    except Exception as e:
+        logger.error(f"Error finalizing batch {batch_id}: {e}")
+        raise
+
+@shared_task
+def import_payroll_file(batch_id, temp_path):
+    """Main task for importing payroll files"""
+    batch = PayrollBatch.objects.get(pk=batch_id)
+    full_path = default_storage.path(temp_path)
+
+    try:
+        # Read and clean file
+        processor = PayrollFileProcessor()
+        df = processor.read_file(full_path)
+        df = processor.clean_data(df)
+
+        # Validate file
+        validator = PayrollFileValidator()
+
+        structure_errors = validator.validate_structure(df)
+        if structure_errors:
+            _handle_batch_error(batch, structure_errors)
+            return
+
+        # Create batch lines
+
+        batch_creator = PayrollBatchCreator()
+        batch_creator._create_batch_lines(batch, df)
+
+        # Chain calculation tasks efficiently
+        calculation_chain = chain(
+            batch_inline_calculation_task.s(batch_id),
+            batch_day_level_calculation_task.s(),
+            batch_week_level_calculation_task.s(),
+            finalize_batch_task.s()
+        )
+
+        calculation_chain.apply_async()
+
+        logger.info(f"Started calculation tasks for batch {batch_id}")
+
+    except Exception as e:
+        logger.error(f"Error importing payroll file for batch {batch_id}: {e}")
+        batch.status = 'error'
+        batch.error_message = str(e)
+        batch.save(update_fields=['status', 'error_message'])
+        raise
+    finally:
+        # Delete temp file
+        default_storage.delete(temp_path)
+
+def _handle_batch_error(batch: PayrollBatch, errors: List[ValidationError]) -> None:
+    """Handle validation errors by updating batch status"""
+    error_msg = "; ".join(str(error) for error in errors[:10])  # Limit error message length
+    if len(errors) > 10:
+        error_msg += f"; ... and {len(errors) - 10} more errors"
+    
+    batch.status = 'error'
+    batch.error_message = error_msg  # Assuming you have this field
+    batch.save(update_fields=['status', 'error_message'])

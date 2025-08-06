@@ -10,6 +10,7 @@ from .models import (
     Farm,
     LaborType,
     Uom,
+    Tariff
 )
 
 class FieldWorkerAdmin(admin.ModelAdmin):
@@ -76,6 +77,10 @@ class LaborTypeAdmin(admin.ModelAdmin):
 class UomAdmin(admin.ModelAdmin):
     list_display = ('name',)
 
+
+class TariffAdmin(admin.ModelAdmin):
+    list_display = ('name', 'activity', 'farm', 'cost_per_unit')
+
 admin.site.register(PayrollBatchLine, PayrollBatchLineAdmin)
 admin.site.register(PayrollBatch)
 
@@ -84,6 +89,7 @@ admin.site.register(ActivityGroup, ActivityGroupAdmin)
 admin.site.register(Activity, ActivityAdmin)
 admin.site.register(LaborType, LaborTypeAdmin)
 admin.site.register(Uom, UomAdmin)
+admin.site.register(Tariff, TariffAdmin)
 
 admin.site.register(FieldWorker, FieldWorkerAdmin)
 admin.site.register(PayrollConfiguration, PayrollConfigurationAdmin)

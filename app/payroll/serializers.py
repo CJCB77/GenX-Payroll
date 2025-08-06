@@ -194,3 +194,6 @@ class PayrollBatchLineSerializer(serializers.ModelSerializer):
             'thirteenth_bonus',
             'fourteenth_bonus',
         ]
+
+class PayrollBatchImportSerializer(serializers.Serializer):
+    file = serializers.FileField()

@@ -189,6 +189,7 @@ class PayrollBatch(models.Model):
     iso_week = models.PositiveSmallIntegerField(null=True, blank=True, db_index=True)
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, blank=True, null=True)
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='draft')
+    error_message = models.TextField(null=True, blank=True)
 
     def save(self, *args, **kwags):
         year, week, _weekday = self.start_date.isocalendar()

@@ -1,4 +1,6 @@
 from django.shortcuts import get_object_or_404
+from django.core.files.storage import default_storage
+from django.core.files.base import ContentFile
 from rest_framework.decorators import action
 from rest_framework.views import APIView
 from rest_framework.response import Response
@@ -8,7 +10,8 @@ from payroll.tasks import (
     sync_employee, 
     sync_contract,
     recalc_line_task,
-    recalc_delete_task
+    recalc_delete_task,
+    import_payroll_file
 )
 from django.utils.decorators import method_decorator
 from django.views.decorators.cache import cache_page
@@ -37,7 +40,8 @@ from .serializers import (
     TariffSerializer,
     PayrollBatchLineSerializer,
     PayrollBatchLineWriteSerializer,
-    LaborTypeSerializer
+    LaborTypeSerializer,
+    PayrollBatchImportSerializer
 )
 from .filters import (
     FieldWorkerFilter,
@@ -158,10 +162,41 @@ class PayrollBatchViewSet(viewsets.ModelViewSet):
     filterset_fields = ['status']
     search_fields = ['name']
 
+    def get_serializer_class(self):
+        if self.action == "import_lines":
+            return PayrollBatchImportSerializer
+        return super().get_serializer_class()
+
     @action(detail=True, methods=['get'])
     def status(self, request, pk=None):
         batch = self.get_object()
-        return Response({"status": batch.status})
+        return Response({"status": batch.status, "error_message": batch.error_message})
+    
+    @action(detail=True, methods=['post'], url_path='import-lines')
+    def import_lines(self, request, pk=None):
+        batch = self.get_object()
+        serializer = PayrollBatchImportSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        batch.status = 'processing'
+        batch.save(update_fields=['status'])
+
+        # Save uploaded file to a temp location
+        upload = serializer.validated_data['file']
+        temp_path = default_storage.save(
+            f"temp/payroll_batch_{batch.id}_{upload.name}",
+            ContentFile(upload.read())
+        )
+
+        # Fire and forget the import task
+        import_payroll_file(batch.id, temp_path)
+
+        return Response(
+            {"detail": "Payroll batch import queued"},
+            status=status.HTTP_202_ACCEPTED
+        )
+
+
 
 class PayrollConfigurationView(generics.RetrieveUpdateAPIView):
     """
@@ -246,3 +281,4 @@ class PayrollBatchLineViewSet(viewsets.ModelViewSet):
         batch.save(update_fields=['status'])
 
         recalc_delete_task.delay(worker_id, payroll_batch_id, date)
+    
